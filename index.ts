@@ -60,21 +60,17 @@ function addImageProcess(src: string): Promise<HTMLImageElement> {
         let img = new Image()
         img.onload = () => resolve(img)
         img.onerror = reject
+        img.crossOrigin = "anonymous";
         img.src = src
     })
 }
 
-async function getImageData(image: string): Promise<ImageData> {
+async function getImageData(image: string): Promise<HTMLImageElement> {
     var canvas = document.createElement('canvas');
     var ctx: CanvasRenderingContext2D = canvas.getContext('2d') as CanvasRenderingContext2D;
 
     // 2) Copy your image data into the canvas
-    var img = await addImageProcess(image);
-
-    // 3) Read your image data
-    var w = img.width, h = img.height;
-    ctx.drawImage(img, 0, 0);
-    return ctx.getImageData(0, 0, w, h);
+    return addImageProcess(image);
 }
 
 (async () => {
@@ -82,28 +78,33 @@ async function getImageData(image: string): Promise<ImageData> {
     if (!canvas)
         return;
 
+
     const ctx: CanvasRenderingContext2D = canvas.getContext('2d', { alpha: false }) as CanvasRenderingContext2D;
 
-    ctx.canvas.width  = window.innerWidth;
+    ctx.canvas.width = window.innerWidth;
     ctx.canvas.height = window.innerHeight;
 
-    const Image = ctx.createImageData(canvas.width, canvas.height);
-    const hauteur_manteau_neigeux = new Array(240);
-    const hauteur_sol = new Array(240);
+    ctx.imageSmoothingEnabled = false;
+
+    let Image: any = undefined;
     const VELOCITY_MOYEN = 1
     const particules_lente: Array<Particule> = new Array();
     const particules_moyenne: Array<Particule> = new Array();
     const particules_rapide: Array<Particule> = new Array();
-    let traineau_pos_y = 200;
     const LCD_COLOR_WHITE = 0xFFFFFFFF;
-    const LCD_COLOR_BLACK = 0xFF000000;
 
-    const CANVAS_WIDTH = Image.width;
-    const CANVAS_HEIGHT = Image.height;
+    const CANVAS_WIDTH = window.innerWidth;
+    const CANVAS_HEIGHT = window.innerHeight;
 
-    let maison_image: ImageData = await getImageData("maison.png");
-    let sapin_image: ImageData = await getImageData("sapin.png");
-    let traineau_image: ImageData = await getImageData("traineau.png");
+    const hauteur_manteau_neigeux = new Array(CANVAS_WIDTH);
+    const hauteur_sol = new Array(CANVAS_WIDTH);
+
+    let maison_image: HTMLImageElement = await getImageData("maison.png");
+    let sapin_image: HTMLImageElement = await getImageData("sapin.png");
+    let traineau_image: HTMLImageElement = await getImageData("traineau.png");
+    let flocon_image: HTMLImageElement = await getImageData("flocon.png");
+
+    let traineau_pos_y = CANVAS_WIDTH;
 
     function initParticules(particules: Array<Particule>, count: number, velocity: number) {
         for (let i = 0; i < count; i++) {
@@ -120,12 +121,11 @@ async function getImageData(image: string): Promise<ImageData> {
     function drawNeige(x: number, y: number, color: number, taille: number) {
         x = Math.trunc(x);
         y = Math.trunc(y);
-        for (let i = x - taille; i < x + taille + 1; i++) {
-            for (let j = y - taille; j < y + taille + 1; j++) {
-                if (i > 0 && i < CANVAS_HEIGHT && j > 0 && j < CANVAS_WIDTH && (i - x == j - y || i - x == y - j || i == x || j == y)) {
-                    writePixel(Image, i, j, color);
-                }
-            }
+
+        if(taille <= 1) {
+            ctx.fillRect(y - taille, x - taille, taille+1, taille+1);
+        } else {
+            ctx.drawImage(flocon_image, y, x);
         }
     }
 
@@ -155,9 +155,10 @@ async function getImageData(image: string): Promise<ImageData> {
         }
     }
 
-    CopyLargeImagetoSmall(Image, sapin_image, CANVAS_HEIGHT-sapin_image.height, 102);
-    CopyLargeImagetoSmall(Image, maison_image, CANVAS_HEIGHT-maison_image.height, 14);
+    ctx.drawImage(sapin_image, 102, CANVAS_HEIGHT-sapin_image.height);
+    ctx.drawImage(maison_image, 14, CANVAS_HEIGHT-maison_image.height);
 
+    Image = ctx.getImageData(0, 0, canvas.width, canvas.height);
     for (let i = 0; i < hauteur_manteau_neigeux.length; i++) {
         hauteur_manteau_neigeux[i] = CANVAS_HEIGHT;
         // Check bottom
@@ -170,83 +171,96 @@ async function getImageData(image: string): Promise<ImageData> {
         hauteur_sol[i] = hauteur_manteau_neigeux[i];
     }
 
-    initParticules(particules_lente, 100, VELOCITY_MOYEN * 0.5);
-    initParticules(particules_moyenne, 60, VELOCITY_MOYEN);
-    initParticules(particules_rapide, 20, VELOCITY_MOYEN * 2.0);
+    Image = undefined;
+
+    ctx.fillStyle = "white";
+    ctx.strokeStyle = "white";
+    ctx.lineWidth = 1;
+
+    initParticules(particules_lente, 100*CANVAS_WIDTH/240, VELOCITY_MOYEN * 0.5);
+    initParticules(particules_moyenne, 60*CANVAS_WIDTH/240, VELOCITY_MOYEN);
+    initParticules(particules_rapide, 20*CANVAS_WIDTH/240, VELOCITY_MOYEN * 2.0);
 
     let frameCount = 0;
     let fpsElement: HTMLDivElement = document.getElementById('fps') as HTMLDivElement;
     setInterval(function () {
         let count = frameCount;
         frameCount = 0;
-        fpsElement.textContent = "FPS: " + count;
+        fpsElement.textContent = "FPS: " + count + " " + window.devicePixelRatio + " " + ctx.canvas.width + " " + ctx.canvas.height;
     }, 1000);
 
+
+    const fpsInterval = 1000 / 60.0;
+    let expectedFrameDate = Date.now();
+
     function updateAnimation(timestamp: DOMHighResTimeStamp) {
-        frameCount++;
-        for(let i=0; i< Image.data.length; i+=1) {
-            Image.data[i] = 0;
-        }
+        let now = Date.now();
+        if(now >= expectedFrameDate) {
+            expectedFrameDate += Math.trunc((now - expectedFrameDate)/fpsInterval)*fpsInterval;
 
-        for (let particule of particules_lente) {
-            if (particule.x < 0 || particule.x >= CANVAS_HEIGHT || particule.y < 0 || particule.y >= CANVAS_WIDTH) {
-                particule.x = 0;
-                particule.y = Math.trunc(Math.random() * CANVAS_WIDTH);
+            frameCount++;
+            ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+            for (let particule of particules_lente) {
+                if (particule.x < 0 || particule.x >= CANVAS_HEIGHT || particule.y < 0 || particule.y >= CANVAS_WIDTH) {
+                    particule.x = 0;
+                    particule.y = Math.trunc(Math.random() * CANVAS_WIDTH);
+                }
+                particule.prevX = particule.x;
+                particule.prevY = particule.y;
+                drawNeige(particule.x, particule.y, LCD_COLOR_WHITE, 0);
+                particule.x += particule.velocity;
             }
-            particule.prevX = particule.x;
-            particule.prevY = particule.y;
-            drawNeige(particule.x, particule.y, LCD_COLOR_WHITE, 0);
-            particule.x += particule.velocity;
-        }
 
-        CopyLargeImagetoSmall(Image, traineau_image, 100, traineau_pos_y);
+            ctx.drawImage(traineau_image, traineau_pos_y, 100);
 
-        traineau_pos_y -= 1;
-        if (traineau_pos_y < -200)
-            traineau_pos_y = 2000;
+            traineau_pos_y -= 1;
+            if (traineau_pos_y < -traineau_image.width)
+                traineau_pos_y = CANVAS_WIDTH * 2;
 
 
-        for (let particule of particules_moyenne) {
-            if (particule.velocity > VELOCITY_MOYEN / 2.0 && (particule.x < 0 || particule.x >= hauteur_manteau_neigeux[Math.trunc(particule.y)] || particule.y < 0 || particule.y >= CANVAS_WIDTH)) {
-                particule.velocity = VELOCITY_MOYEN / 4.0;
+            for (let particule of particules_moyenne) {
+                if (particule.velocity > VELOCITY_MOYEN / 2.0 && (particule.x < 0 || particule.x >= hauteur_manteau_neigeux[Math.trunc(particule.y)] || particule.y < 0 || particule.y >= CANVAS_WIDTH)) {
+                    particule.velocity = VELOCITY_MOYEN / 4.0;
 
-                propagateManteauNeigeux(particule.y);
+                    propagateManteauNeigeux(particule.y);
+                }
+            }
+
+            for (let y = 0; y < hauteur_manteau_neigeux.length; y++) {
+                if(hauteur_manteau_neigeux[y] < hauteur_sol[y]) {
+                    ctx.fillRect(y, hauteur_manteau_neigeux[y], 1, hauteur_sol[y]-hauteur_manteau_neigeux[y]);
+                }
+            }
+
+            ctx.drawImage(sapin_image, 102, CANVAS_HEIGHT-sapin_image.height);
+            ctx.drawImage(maison_image, 14, CANVAS_HEIGHT-maison_image.height);
+
+            for (let particule of particules_moyenne) {
+                if (particule.x < 0 || particule.x >= hauteur_sol[Math.trunc(particule.y)] + 1 || particule.y < 0 || particule.y >= CANVAS_WIDTH) {
+                    particule.x = 0;
+                    particule.y = Math.trunc(Math.random() * CANVAS_WIDTH);
+                    particule.velocity = VELOCITY_MOYEN;
+                }
+                particule.prevX = particule.x;
+                particule.prevY = particule.y;
+                drawNeige(particule.x, particule.y, LCD_COLOR_WHITE, 1);
+                particule.x += particule.velocity;
+            }
+
+
+            for (let particule of particules_rapide) {
+                if (particule.x < 0 || particule.x >= CANVAS_HEIGHT || particule.y < 0 || particule.y >= CANVAS_WIDTH) {
+                    particule.x = 0;
+                    particule.y = Math.trunc(Math.random() * CANVAS_WIDTH);
+                }
+                particule.prevX = particule.x;
+                particule.prevY = particule.y;
+                drawNeige(particule.x, particule.y, LCD_COLOR_WHITE, 4);
+                particule.x += particule.velocity;
             }
         }
 
-        for (let y = 0; y < hauteur_manteau_neigeux.length; y++) {
-            for (let x = hauteur_manteau_neigeux[y]; x < hauteur_sol[y]; x++) {
-                writePixel(Image, x, y, LCD_COLOR_WHITE);
-            }
-        }
-
-        CopyLargeImagetoSmall(Image, sapin_image, CANVAS_HEIGHT-sapin_image.height, 102);
-        CopyLargeImagetoSmall(Image, maison_image, CANVAS_HEIGHT-maison_image.height, 14);
-
-        for (let particule of particules_moyenne) {
-            if (particule.x < 0 || particule.x >= hauteur_sol[Math.trunc(particule.y)] + 1 || particule.y < 0 || particule.y >= CANVAS_WIDTH) {
-                particule.x = 0;
-                particule.y = Math.trunc(Math.random() * CANVAS_WIDTH);
-                particule.velocity = VELOCITY_MOYEN;
-            }
-            particule.prevX = particule.x;
-            particule.prevY = particule.y;
-            drawNeige(particule.x, particule.y, LCD_COLOR_WHITE, 1);
-            particule.x += particule.velocity;
-        }
-
-
-        for (let particule of particules_rapide) {
-            if (particule.x < 0 || particule.x >= CANVAS_HEIGHT || particule.y < 0 || particule.y >= CANVAS_WIDTH) {
-                particule.x = 0;
-                particule.y = Math.trunc(Math.random() * CANVAS_WIDTH);
-            }
-            particule.prevX = particule.x;
-            particule.prevY = particule.y;
-            drawNeige(particule.x, particule.y, LCD_COLOR_WHITE, 4);
-            particule.x += particule.velocity;
-        }
-        ctx.putImageData(Image, 0, 0);
         window.requestAnimationFrame(updateAnimation);
     }
     window.requestAnimationFrame(updateAnimation);
