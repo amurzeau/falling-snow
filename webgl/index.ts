@@ -45,7 +45,19 @@ uniform sampler2D backgroundTextures[3];
 uniform vec4 scale;
 uniform vec2 random;
 
-vec4 get_wrapped_falling_snow(vec2 offset) {
+const vec3 bitEnc = vec3(1.,255.,65025.) / 2.0;
+const vec3 bitDec = 1./bitEnc;
+vec3 EncodeFloatRGB (float v) {
+    vec3 enc = bitEnc * v;
+    enc = fract(enc);
+    enc -= enc.yzz * vec2(1./255., 0.).xxy;
+    return enc;
+}
+float DecodeFloatRGB (vec3 v) {
+    return dot(v, bitDec);
+}
+
+int get_wrapped_falling_snow(vec2 offset) {
     float new_flake = step(scale.w, gl_FragCoord.y + offset.y);
 
     // Add a randomization to X component when it is a new_flake
@@ -53,11 +65,16 @@ vec4 get_wrapped_falling_snow(vec2 offset) {
 
     vec2 wrapped_coord = mod((gl_FragCoord.xy + offset), scale.zw);
 
-    return vec4(texture(state, wrapped_coord / scale.xy).xyz, new_flake);
+    // Snow flake position is encoded in first component only
+    int value = int(texture(state, wrapped_coord / scale.xy).x * 255.0);
+    if(new_flake > 0.0) {
+        value |= 0x04;
+    }
+    return value;
 }
 
 vec4 get_snow_bottom(vec2 offset) {
-    vec2 wrapped_coord = mod((gl_FragCoord.xy + offset), scale.zw);
+    vec2 wrapped_coord = clamp((gl_FragCoord.xy + offset), vec2(0.0), scale.zw);
     return texture(state, (wrapped_coord / scale.xy));
 }
 
@@ -72,65 +89,126 @@ float get_environment(vec2 offset) {
     return mix(texture1.a, texture2.a, texture2.a);
 }
 
-void main() {
+float get_falling_snow_state() {
     // Get state above
     // Color contains particule presence
     // Alpha contains if particule touched bottom
-    float particle_slow = get_wrapped_falling_snow(vec2(0.0, 1.0)).r;
-    float particle_medium = get_wrapped_falling_snow(vec2(0.0, 2.0)).g;
-    float particle_fast = get_wrapped_falling_snow(vec2(0.0, 4.0)).b;
+    int particle_slow =   get_wrapped_falling_snow(vec2(0.0, 1.0)) & 0x1;
+    int particle_medium = get_wrapped_falling_snow(vec2(0.0, 2.0)) & (0x2 | 0x4);
+    int particle_fast =   get_wrapped_falling_snow(vec2(0.0, 4.0)) & 0x8;
 
-    float current_bottom_state = get_snow_bottom(vec2(0.0, 0.0)).a;
-    float is_snow_above =
-        ceil(
-            get_snow_bottom(vec2(0.0, 1.0)).a +
-            get_snow_bottom(vec2(-1.0, 1.0)).a +
-            get_snow_bottom(vec2(1.0, 1.0)).a
+    return float(
+        particle_slow |
+        particle_medium |
+        particle_fast
+    ) / 255.0;
+}
+
+float get_snow_arround(float x, float y) {
+    return DecodeFloatRGB(get_snow_bottom(vec2(x, y)).gba);
+}
+
+bool is_snow_arround(float x, float y) {
+    return
+        DecodeFloatRGB(get_snow_bottom(vec2(x, y)).gba) > 0.0;
+}
+
+bool is_snow_or_env_arround(float x, float y) {
+    return
+        DecodeFloatRGB(get_snow_bottom(vec2(x, y)).gba) > 0.0 ||
+        get_environment(vec2(x, y)) > 0.0;
+}
+
+vec3 encode_snow_particules(float snow_particule_age) {
+    return EncodeFloatRGB(snow_particule_age);
+}
+
+bool get_snow_flake_dropped() {
+    int snow_present =
+        int(get_snow_bottom(vec2(0.0, 1.0)).r * 255.0) |
+        int(get_snow_bottom(vec2(0.0, 0.0)).r * 255.0);
+
+    return (snow_present & 0x2) != 0 && (snow_present & 0x4) != 0;
+}
+
+void main() {
+    // Snow particule gravity
+    //vec2 gravity = vec2(0.0, -1.0);
+
+    bool is_environment_below =
+        get_environment(vec2(0.0, 0.0)) == 0.0 &&
+        get_environment(vec2(0.0, -1.0)) > 0.0;
+
+    bool is_environment_here =
+        get_environment(vec2(0.0, 1.0)) == 0.0 &&
+        get_environment(vec2(0.0, 0.0)) > 0.0;
+
+    // Particule propagation:
+    // A particule move to current pixel position when there is:
+    // - no particule here currently
+    // - no environment
+    // - a particule just above
+    // - a above right and right
+    // - a above left and left and left-left, this check ensure sliding particule are not duplicated when they can go left and right
+    bool particule_above = is_snow_arround(0.0, 1.0);
+    bool particule_above_left = (is_snow_arround(-1.0, 1.0) && is_snow_or_env_arround(-1.0, 0.0) && is_snow_or_env_arround(-2.0, 0.0));
+    bool particule_above_right = (is_snow_arround(1.0, 1.0) && is_snow_or_env_arround(1.0, 0.0));
+    bool particule_move_to_here_and_appears =
+        !is_snow_or_env_arround(0.0, 0.0) && (
+            particule_above ||
+            particule_above_left ||
+            particule_above_right
         );
-    float is_pixel_not_candidate_for_removing = min(abs(random.y*scale.x - gl_FragCoord.x), 1.0);
-
-    float is_environment_below =
-        (1.0 - get_environment(vec2(0.0, 0.0))) *
-        get_environment(vec2(0.0, -1.0));
-
-    // After 10 pixel height, snow can't grow anymore
-    float snow_height_below = max(is_environment_below, max(get_snow_bottom(vec2(0.0, -1.0)).a - 0.1, current_bottom_state));
-
-    // There is snow below, enough to be stable (avoiding tall snow accumulation at one column)
-    float is_bottom_stable =
-        is_environment_below +
-        ceil(
-            snow_height_below *
-            get_snow_bottom(vec2(-1.0, -1.0)).a *
-            get_snow_bottom(vec2(1.0, -1.0)).a
+    float particule_age_origin = 
+        !particule_move_to_here_and_appears ? get_snow_arround(0.0, 0.0) :
+        (
+            particule_above ? get_snow_arround(0.0, 1.0) :
+                (particule_above_left ? get_snow_arround(-1.0, 1.0) : get_snow_arround(1.0, 1.0))
         );
-
-
-    // Adjust chance to remove according to height of pixel above bottom to get mostly 10px of snow (50% of chance at 10px of height)
-    float snow_removal_chance = 1.0 - current_bottom_state;
-
-    // Don't remove when
-    // - there is snow above (is_snow_above)
-    // - the current processed pixel is not the random one candidate for removing (is_pixel_not_candidate_for_removing)
-    // - snow below is not stable, this happen when at the last line of snow (1.0 - is_bottom_stable)
-    // The chance to remove is defined by first argument:
-    // - 1.0 => 100% chance of removal (if above conditions fullfilled)
-    // - 0.0 => 0% chance of removal
-    float remove_instead = step(snow_removal_chance, random.x + is_snow_above + is_pixel_not_candidate_for_removing + (1.0 - is_bottom_stable));
-
+    
+    // Particule propagation:
+    // A particule move out of current pixel position when there is:
+    // - no particule below (particule fall)
+    // - no particule below left / below right (particule fall and slide left / right)
+    // - no environment below
+    bool particule_move_out_and_disappears =
+        is_snow_arround(0.0, 0.0) && (
+            !is_snow_or_env_arround(0.0, -1.0) ||
+            (is_snow_or_env_arround(0.0, -1.0) && !is_snow_or_env_arround(1.0, -1.0) && !is_snow_or_env_arround(1.0, 0.0)) ||
+            (is_snow_or_env_arround(0.0, -1.0) && !is_snow_or_env_arround(-1.0, -1.0) && !is_snow_or_env_arround(-1.0, 0.0))
+        );
     
     // Snow dropped on floor when there was a snow flake at our position or at above position.
     // Snow that drop on floor move at 2 pixels at once.
-    float is_snow_flake_dropped =
-        get_snow_bottom(vec2(0.0, 1.0)).g + get_snow_bottom(vec2(0.0, 0.0)).g;
+    bool is_snow_flake_dropped = get_snow_flake_dropped();
 
-    fragColor = vec4(particle_slow,
-        particle_medium,
-        particle_fast,
-        min(
-            (ceil(current_bottom_state) + is_bottom_stable * is_snow_flake_dropped) * remove_instead,
-            1.0
-        ) * snow_height_below
+
+    // Particule appears because of snow falling and touching the bottom when:
+    // - There is snow below but not where we are
+    // - A medium particule fall down
+    bool particule_fall_bottom_and_appears =
+        is_snow_flake_dropped &&
+        !is_snow_or_env_arround(0.0, 0.0) &&
+        is_snow_or_env_arround(0.0, -1.0);
+
+    // Particule is present if:
+    // - There was a particule here and it didn't move
+    // - A particule moved to here
+    // - Snow fallen here
+    // - We are at the bottom and we keep a covering of snow
+    bool particule_is_present =
+        (get_snow_arround(0.0, 0.0) > 0.0 && !particule_move_out_and_disappears) ||
+        particule_move_to_here_and_appears ||
+        particule_fall_bottom_and_appears ||
+        gl_FragCoord.y < 1.0;
+
+    float particule_age =
+        (particule_fall_bottom_and_appears || gl_FragCoord.y < 1.0) ? 1.0
+            : max(particule_age_origin - 0.0001, 0.0);
+
+    fragColor = vec4(
+        get_falling_snow_state(),
+        encode_snow_particules(particule_is_present ? particule_age : 0.0)
     );
 }
   `;
@@ -177,8 +255,30 @@ const float snow_flake_large[25] = float[25](
     1.0, 0.0, 1.0, 0.0, 1.0
 );
 
+
+const vec3 bitEnc = vec3(1.,255.,65025.) / 2.0;
+const vec3 bitDec = 1./bitEnc;
+vec3 EncodeFloatRGB (float v) {
+    vec3 enc = bitEnc * v;
+    enc = fract(enc);
+    enc -= enc.yzz * vec2(1./255., 0.).xxy;
+    return enc;
+}
+float DecodeFloatRGB (vec3 v) {
+    return dot(v, bitDec);
+}
+
 vec4 get(vec2 offset) {
-    return texture(state, (gl_FragCoord.xy + offset) / scale.xy);
+    vec4 texel = texture(state, (gl_FragCoord.xy + offset) / scale.xy);
+    int snow_flakes = int(texel.r * 255.0);
+    float particule_age = DecodeFloatRGB(texel.gba) > 0.0 ? mix(0.5, 1.0, DecodeFloatRGB(texel.gba)) : 0.0;
+
+    texel.r = (snow_flakes & 0x01) != 0 ? 1.0 : 0.0;
+    texel.g = (snow_flakes & 0x02) != 0 ? 1.0 : 0.0;
+    texel.b = (snow_flakes & 0x08) != 0 ? 1.0 : 0.0;
+    texel.a = particule_age;
+
+    return texel;
 }
 
 vec4 get_background(sampler2D sampler, vec2 offset) {
@@ -217,8 +317,8 @@ vec4 in_snow_flake() {
         }
     }
 
-    vec4 snow1 = vec4((snow_value1));
-    vec4 snow2 = vec4((snow_value2));
+    vec4 snow1 = vec4(snow_value1);
+    vec4 snow2 = vec4(snow_value2);
 
     vec4 texture1 = get_background(backgroundTextures[0], vec2(-10.0, 0.0));
     vec4 texture2 = get_background(backgroundTextures[1], vec2(-120.0, 0.0));
@@ -226,7 +326,7 @@ vec4 in_snow_flake() {
     vec3 blendedColor = snow1.rgb;
     blendedColor = mix(blendedColor, texture1.rgb, texture1.a);
     blendedColor = mix(blendedColor, texture2.rgb, texture2.a);
-    blendedColor = mix(blendedColor, snow2.rgb, snow2.a);
+    blendedColor = snow2.a > 0.0 ? snow2.rgb : blendedColor;
 
     return vec4(blendedColor, 1.0);
 }
@@ -394,15 +494,15 @@ function textureFromImage(gl: WebGL2RenderingContext, image: HTMLImageElement) {
     const flake_sizes = [6, 2, 1];
     const particle_count = canvas.width*canvas.height/2000;
     for(let i = 0; i < rand.length; i += 4) {
-        rand[i + 0] = Math.random() < 0.0006 ? 255 : 0;
-        rand[i + 1] = Math.random() < 0.0002 ? 255 : 0;
-        rand[i + 2] = Math.random() < 0.0001 ? 255 : 0;
+        rand[i + 0] =
+            ((Math.random() < 0.0006 ? 1 : 0) << 0) |
+            ((Math.random() < 0.0002 ? 3 : 0) << 1) |
+            ((Math.random() < 0.0001 ? 1 : 0) << 3);
 
-        let column = Math.trunc(i/4/canvas.width);
-        if(column == 0 || column == canvas.height)
-            rand[i + 3] = 255;
-        else
-            rand[i + 3] = 0;
+
+        rand[i + 1] = 0;
+        rand[i + 2] = 0;
+        rand[i + 3] = 0;
     }
     gl.bindTexture(gl.TEXTURE_2D, state[currentTextureIndex]);
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, canvas.width, canvas.height+1, gl.RGBA, gl.UNSIGNED_BYTE, rand);
@@ -456,7 +556,7 @@ function textureFromImage(gl: WebGL2RenderingContext, image: HTMLImageElement) {
 
     function updateAnimation(timestamp: DOMHighResTimeStamp) {
         let now = Date.now();
-        if (1) {
+        if (now >= expectedFrameDate) {
             expectedFrameDate += Math.trunc((now - expectedFrameDate) / fpsInterval + 1) * fpsInterval;
 
             frameCount++;
