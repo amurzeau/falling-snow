@@ -81,15 +81,18 @@ vec4 get_snow_bottom(vec2 offset) {
     return texture(state, (wrapped_coord / scale.xy));
 }
 
-vec4 get_background(sampler2D sampler, vec2 offset) {
-    return texelFetch(sampler, ivec2(gl_FragCoord.xy + offset), 0);
+vec4 get_background(sampler2D sampler, vec2 offset, float scale) {
+    return texelFetch(sampler, ivec2((gl_FragCoord.xy + offset) / scale), 0);
 }
 
 float get_environment(vec2 offset) {
-    vec4 texture1 = get_background(backgroundTextures[0], vec2(-10.0, 0.0) + offset);
-    vec4 texture2 = get_background(backgroundTextures[1], vec2(-120.0, 0.0) + offset);
+    vec4 texture1 = get_background(backgroundTextures[0], vec2(-10.0, 0.0) + offset, 1.0);
+    vec4 texture2 = get_background(backgroundTextures[1], vec2(-120.0, 0.0) + offset, 1.0);
+    vec4 texture3 = get_background(backgroundTextures[1], vec2(-256.0, 0.0) + offset, 2.0);
 
-    return mix(texture1.a, texture2.a, texture2.a);
+    float blend = mix(texture1.a, texture2.a, texture2.a);
+    blend = mix(blend, texture3.a, texture3.a);
+    return blend;
 }
 
 float get_falling_snow_state() {
@@ -280,8 +283,8 @@ vec4 get(vec2 offset) {
     return texel;
 }
 
-vec4 get_background(sampler2D sampler, vec2 offset) {
-    return texelFetch(sampler, ivec2(gl_FragCoord.xy + offset), 0);
+vec4 get_background(sampler2D sampler, vec2 offset, float scale) {
+    return texelFetch(sampler, ivec2((gl_FragCoord.xy + offset) / scale), 0);
 }
 
 vec4 in_snow_flake() {
@@ -316,15 +319,17 @@ vec4 in_snow_flake() {
         }
     }
 
-    vec4 snow1 = vec4(snow_value1);
-    vec4 snow2 = vec4(snow_value2);
+    vec4 snow1 = vec4(ceil(snow_value1));
+    vec4 snow2 = vec4(ceil(snow_value2));
 
-    vec4 texture1 = get_background(backgroundTextures[0], vec2(-10.0, 0.0));
-    vec4 texture2 = get_background(backgroundTextures[1], vec2(-120.0, 0.0));
+    vec4 texture1 = get_background(backgroundTextures[0], vec2(-10.0, 0.0), 1.0);
+    vec4 texture2 = get_background(backgroundTextures[1], vec2(-120.0, 0.0), 1.0);
+    vec4 texture3 = get_background(backgroundTextures[1], vec2(-256.0, 0.0), 2.0);
 
     vec3 blendedColor = snow1.rgb;
     blendedColor = mix(blendedColor, texture1.rgb, texture1.a);
     blendedColor = mix(blendedColor, texture2.rgb, texture2.a);
+    blendedColor = mix(blendedColor, texture3.rgb, texture3.a);
     blendedColor = snow2.a > 0.0 ? snow2.rgb : blendedColor;
 
     return vec4(blendedColor, 1.0);
@@ -496,6 +501,73 @@ function textureFromImage(gl, image) {
         frameCount = 0;
         fpsElement.textContent = "FPS: " + count + " " + window.devicePixelRatio + " " + canvas.width + " " + canvas.height;
     }, 1000);
+    let x = -1;
+    let y = -1;
+    let generateSnowByMouseInterval = undefined;
+    function handleMouseEvent(event) {
+        if (x != -1 || y != -1) {
+            return;
+        }
+        const rect = canvas.getBoundingClientRect();
+        const localX = event.clientX - rect.left;
+        const localY = canvas.height - (event.clientY - rect.top);
+        x = localX;
+        y = localY;
+        if (generateSnowByMouseInterval !== undefined) {
+            clearInterval(generateSnowByMouseInterval);
+        }
+        generateSnowByMouseInterval = setInterval(function () {
+            x = localX;
+            y = localY;
+        }, 50);
+    }
+    canvas.addEventListener('mousedown', handleMouseEvent);
+    canvas.addEventListener('mouseup', function (e) {
+        if (generateSnowByMouseInterval !== undefined) {
+            clearInterval(generateSnowByMouseInterval);
+        }
+    });
+    canvas.addEventListener('mousemove', function (event) {
+        if (event.buttons & 1) {
+            handleMouseEvent(event);
+        }
+    });
+    function handleTouchEvent(event) {
+        if (x != -1 || y != -1) {
+            return;
+        }
+        if (event.touches.length == 0)
+            return;
+        const touchEvent = event.touches[0];
+        const rect = canvas.getBoundingClientRect();
+        const localX = touchEvent.clientX - rect.left;
+        const localY = canvas.height - (touchEvent.clientY - rect.top);
+        x = localX;
+        y = localY;
+        if (generateSnowByMouseInterval !== undefined) {
+            clearInterval(generateSnowByMouseInterval);
+        }
+        generateSnowByMouseInterval = setInterval(function () {
+            x = localX;
+            y = localY;
+        }, 50);
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    canvas.addEventListener("touchstart", handleTouchEvent);
+    canvas.addEventListener("touchmove", function (event) {
+        handleTouchEvent(event);
+    });
+    canvas.addEventListener("touchend", function (event) {
+        if (generateSnowByMouseInterval !== undefined) {
+            clearInterval(generateSnowByMouseInterval);
+        }
+    });
+    canvas.addEventListener("touchcancel", function (event) {
+        if (generateSnowByMouseInterval !== undefined) {
+            clearInterval(generateSnowByMouseInterval);
+        }
+    });
     const fpsInterval = 1000 / 60.0;
     let expectedFrameDate = Date.now();
     function updateAnimation(timestamp) {
@@ -506,6 +578,10 @@ function textureFromImage(gl, image) {
             {
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, state[currentTextureIndex]);
+                if (x != -1 && y != -1) {
+                    gl.texSubImage2D(gl.TEXTURE_2D, 0, x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 128, 0, 0]));
+                    x = y = -1;
+                }
                 currentTextureIndex = currentTextureIndex == 1 ? 0 : 1;
                 // Render to texture
                 gl.useProgram(programInfo.program);
