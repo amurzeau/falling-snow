@@ -71,6 +71,7 @@ uniform sampler2D state;
 uniform sampler2D backgroundTexture;
 uniform vec4 scale;
 uniform vec2 random;
+uniform float time;
 
 const vec2 bitEnc = vec2(1.,255.) / 2.0;
 const vec2 bitDec = 1./bitEnc;
@@ -154,6 +155,19 @@ bool get_snow_flake_dropped() {
     return (snow_present & 0x2) != 0 && (snow_present & 0x4) != 0;
 }
 
+// return 1 if v inside the box, return 0 otherwise
+float insideBox(vec2 v, vec2 bottomLeft, vec2 topRight) {
+    vec2 s = step(bottomLeft, v) - step(topRight, v);
+    return s.x * s.y;   
+}
+
+vec2 rotate(vec2 v, float a) {
+	float s = sin(a);
+	float c = cos(a);
+	mat2 m = mat2(c, s, -s, c);
+	return m * v;
+}
+
 void main() {
     // Snow particule gravity
     //vec2 gravity = vec2(0.0, -1.0);
@@ -229,10 +243,23 @@ void main() {
         (particule_fall_bottom_and_appears || gl_FragCoord.y < 1.0) ? 1.0
             : max(particule_age_origin - 0.0001, 0.0);
 
+    float current_smoke_age = get_snow_bottom(vec2(0.0, 0.0)).a;
+    float ratio_height = clamp((gl_FragCoord.y - 70.0) / 40.0, 0.0, 1.0);
+    vec2 smoke_origin = vec2(0.0, -1.0);
+    smoke_origin = rotate(smoke_origin, (ratio_height*2.0 + 2.0*sin((0.1+ratio_height) * random.x * gl_FragCoord.y * gl_FragCoord.x)) * (-0.25 * 3.14159));
+    smoke_origin = (1.0 + 5.0*ratio_height)*smoke_origin;
+    float smoke_source = get_snow_bottom(smoke_origin).a * 1.01;
+    float speed = (2.0 - ratio_height) * 0.1;
+    float smoke_age = insideBox(gl_FragCoord.xy, vec2(25.0, 69.0), vec2(35.0, 71.0)) > 0.0 ? 1.0 :
+    (
+        min(current_smoke_age * (1.0 - speed) + speed * smoke_source, 1.0)
+    );
+
+
     fragColor = vec4(
         get_falling_snow_state(),
         encode_snow_particules(particule_is_present ? particule_age : 0.0),
-        0.0
+        smoke_age
     );
 }
   `;
@@ -329,9 +356,8 @@ vec4 blend_color() {
     snow_value = ceil(min(snow_value, vec2(1.0)));
 
     // Texture with images
-    vec4 texture = texture(backgroundTexture, gl_FragCoord.xy / scale.xy);
+    vec4 texture_with_light = texture(backgroundTexture, gl_FragCoord.xy / scale.xy);
     // Add lights
-    vec4 texture_with_light = texture;
 
     // 17 lights for house
     float light_power_1 = 1.0 * (step(0.5, time));
@@ -378,6 +404,10 @@ vec4 blend_color() {
     vec3 blendedColor = snow_value.xxx;
     blendedColor = mix(blendedColor, texture_with_light.rgb, texture_with_light.a);
     blendedColor = mix(blendedColor, snow_value.yyy, snow_value.y);
+
+    // Smoke
+    vec4 texel = texture(state, gl_FragCoord.xy / scale.xy);
+    blendedColor = mix(blendedColor, vec3(0.5, 0.5, 0.5), (texel.a));
 
     return vec4(blendedColor, 1.0);
 }
@@ -689,6 +719,7 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
             scale: gl.getUniformLocation(shaderProgram, "scale"),
             state: gl.getUniformLocation(shaderProgram, "state"),
             random: gl.getUniformLocation(shaderProgram, "random"),
+            time: gl.getUniformLocation(shaderProgram, "time"),
             backgroundTexture: gl.getUniformLocation(shaderProgram, "backgroundTexture"),
         },
     };
@@ -807,6 +838,7 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
                     Math.random(),
                     Math.random(),
                 );
+                gl.uniform1f(programInfo.uniformLocations.time, (now % 1000) / 1000.0);
                 gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
                 gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, state[currentTextureIndex], 0);
                 gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
