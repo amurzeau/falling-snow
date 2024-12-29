@@ -37,26 +37,51 @@ const vsSource = `#version 300 es
     }
   `;
 // Fragment shader program
+const fsPreprocessEnvironmentSource = `#version 300 es
+#ifdef GL_ES
+precision highp float;
+#endif
+
+out vec4 fragColor;
+uniform sampler2D backgroundTextures[2];
+
+vec4 get_background(sampler2D sampler, vec2 offset, float scale) {
+    return texelFetch(sampler, ivec2((gl_FragCoord.xy + offset) / scale), 0);
+}
+
+void main() {
+    vec4 texture1 = get_background(backgroundTextures[0], vec2(-10.0, 0.0), 1.0);
+    vec4 texture2 = get_background(backgroundTextures[1], vec2(-120.0, 0.0), 1.0);
+    vec4 texture3 = get_background(backgroundTextures[1], vec2(-256.0, 0.0), 2.0);
+
+    vec4 blend = texture1.rgba;
+    blend = mix(blend, texture2.rgba, texture2.a);
+    blend = mix(blend, texture3.rgba, texture3.a);
+
+    fragColor = blend;
+}
+  `;
 const fsSource = `#version 300 es
 #ifdef GL_ES
-precision mediump float;
+precision highp float;
+precision highp sampler2D;
 #endif
 
 out vec4 fragColor;
 uniform sampler2D state;
-uniform sampler2D backgroundTextures[3];
+uniform sampler2D backgroundTexture;
 uniform vec4 scale;
 uniform vec2 random;
 
-const vec3 bitEnc = vec3(1.,255.,65025.) / 2.0;
-const vec3 bitDec = 1./bitEnc;
-vec3 EncodeFloatRGB (float v) {
-    vec3 enc = bitEnc * v;
+const vec2 bitEnc = vec2(1.,255.) / 2.0;
+const vec2 bitDec = 1./bitEnc;
+vec2 EncodeFloatRGB (float v) {
+    vec2 enc = bitEnc * v;
     enc = fract(enc);
-    enc -= enc.yzz * vec2(1./255., 0.).xxy;
+    enc -= enc.yy * vec2(1./255., 0.).xy;
     return enc;
 }
-float DecodeFloatRGB (vec3 v) {
+float DecodeFloatRGB (vec2 v) {
     return dot(v, bitDec);
 }
 
@@ -77,22 +102,15 @@ int get_wrapped_falling_snow(vec2 offset) {
 }
 
 vec4 get_snow_bottom(vec2 offset) {
-    vec2 wrapped_coord = clamp((gl_FragCoord.xy + offset), vec2(0.0), scale.zw);
+    vec2 wrapped_coord = gl_FragCoord.xy + offset;
+    wrapped_coord.x = mod(wrapped_coord.x, scale.z);
     return texture(state, (wrapped_coord / scale.xy));
 }
 
-vec4 get_background(sampler2D sampler, vec2 offset, float scale) {
-    return texelFetch(sampler, ivec2((gl_FragCoord.xy + offset) / scale), 0);
-}
-
 float get_environment(vec2 offset) {
-    vec4 texture1 = get_background(backgroundTextures[0], vec2(-10.0, 0.0) + offset, 1.0);
-    vec4 texture2 = get_background(backgroundTextures[1], vec2(-120.0, 0.0) + offset, 1.0);
-    vec4 texture3 = get_background(backgroundTextures[1], vec2(-256.0, 0.0) + offset, 2.0);
-
-    float blend = mix(texture1.a, texture2.a, texture2.a);
-    blend = mix(blend, texture3.a, texture3.a);
-    return blend;
+    vec2 wrapped_coord = gl_FragCoord.xy + offset;
+    wrapped_coord.x = mod(wrapped_coord.x, scale.z);
+    return texture(backgroundTexture, (wrapped_coord / scale.xy)).a;
 }
 
 float get_falling_snow_state() {
@@ -111,21 +129,21 @@ float get_falling_snow_state() {
 }
 
 float get_snow_arround(float x, float y) {
-    return DecodeFloatRGB(get_snow_bottom(vec2(x, y)).gba);
+    return DecodeFloatRGB(get_snow_bottom(vec2(x, y)).gb);
 }
 
 bool is_snow_arround(float x, float y) {
     return
-        DecodeFloatRGB(get_snow_bottom(vec2(x, y)).gba) > 0.0;
+        DecodeFloatRGB(get_snow_bottom(vec2(x, y)).gb) > 0.0;
 }
 
 bool is_snow_or_env_arround(float x, float y) {
     return
-        DecodeFloatRGB(get_snow_bottom(vec2(x, y)).gba) > 0.0 ||
-        get_environment(vec2(x, y)) > 0.0;
+        (DecodeFloatRGB(get_snow_bottom(vec2(x, y)).gb) +
+        get_environment(vec2(x, y))) > 0.0;
 }
 
-vec3 encode_snow_particules(float snow_particule_age) {
+vec2 encode_snow_particules(float snow_particule_age) {
     return EncodeFloatRGB(snow_particule_age);
 }
 
@@ -214,7 +232,8 @@ void main() {
 
     fragColor = vec4(
         get_falling_snow_state(),
-        encode_snow_particules(particule_is_present ? particule_age : 0.0)
+        encode_snow_particules(particule_is_present ? particule_age : 0.0),
+        0.0
     );
 }
   `;
@@ -230,50 +249,25 @@ precision mediump float;
 
 out vec4 fragColor;
 uniform sampler2D state;
-uniform sampler2D backgroundTextures[3];
+uniform sampler2D backgroundTexture;
 uniform vec4 scale;
 
-const float snow_flake_small[25] = float[25](
-    0.0, 0.0, 0.0, 0.0, 0.0,
-    0.0, 0.0, 0.0, 0.0, 0.0,
-    0.0, 0.0, 1.0, 0.0, 0.0,
-    0.0, 0.0, 0.0, 0.0, 0.0,
-    0.0, 0.0, 0.0, 0.0, 0.0
-);
-
-const float snow_flake_medium[25] = float[25](
-    0.0, 0.0, 0.0, 0.0, 0.0,
-    0.0, 0.0, 1.0, 1.0, 0.0,
-    0.0, 0.0, 1.0, 1.0, 0.0,
-    0.0, 0.0, 0.0, 0.0, 0.0,
-    0.0, 0.0, 0.0, 0.0, 0.0
-);
-
-const float snow_flake_large[25] = float[25](
-    1.0, 0.0, 1.0, 0.0, 1.0,
-    0.0, 1.0, 1.0, 1.0, 0.0,
-    1.0, 1.0, 1.0, 1.0, 1.0,
-    0.0, 1.0, 1.0, 1.0, 0.0,
-    1.0, 0.0, 1.0, 0.0, 1.0
-);
-
-
-const vec3 bitEnc = vec3(1.,255.,65025.) / 2.0;
-const vec3 bitDec = 1./bitEnc;
-vec3 EncodeFloatRGB (float v) {
-    vec3 enc = bitEnc * v;
+const vec2 bitEnc = vec2(1.,255.) / 2.0;
+const vec2 bitDec = 1./bitEnc;
+vec2 EncodeFloatRGB (float v) {
+    vec2 enc = bitEnc * v;
     enc = fract(enc);
-    enc -= enc.yzz * vec2(1./255., 0.).xxy;
+    enc -= enc.yy * vec2(1./255., 0.).xy;
     return enc;
 }
-float DecodeFloatRGB (vec3 v) {
+float DecodeFloatRGB (vec2 v) {
     return dot(v, bitDec);
 }
 
 vec4 get(vec2 offset) {
     vec4 texel = texture(state, (gl_FragCoord.xy + offset) / scale.xy);
     int snow_flakes = int(texel.r * 255.0);
-    float particule_age = DecodeFloatRGB(texel.gba) > 0.0 ? mix(0.5, 1.0, DecodeFloatRGB(texel.gba)) : 0.0;
+    float particule_age = DecodeFloatRGB(texel.gb);
 
     texel.r = (snow_flakes & 0x01) != 0 ? 1.0 : 0.0;
     texel.g = (snow_flakes & 0x02) != 0 ? 1.0 : 0.0;
@@ -283,54 +277,50 @@ vec4 get(vec2 offset) {
     return texel;
 }
 
-vec4 get_background(sampler2D sampler, vec2 offset, float scale) {
-    return texelFetch(sampler, ivec2((gl_FragCoord.xy + offset) / scale), 0);
+vec2 processSnowFlake(float x, float y, float small, float medium, float large) {
+    vec4 snow_state = get(vec2(x, y));
+
+    return
+        vec2(
+            // Back snow flakes
+            snow_state.r * small + snow_state.g * medium,
+            // Front snow flakes and Snow particles age
+            snow_state.b * large + snow_state.a * small
+        );
 }
 
 vec4 in_snow_flake() {
-    float snow_value1 = 0.0;
-    float snow_value2 = 0.0;
-    float x;
-    float y;
+    vec2 snow_value;
+    
+    snow_value =  processSnowFlake(-2.0, -2.0, 0.0, 0.0, 1.0);
+    snow_value += processSnowFlake(0.0, -2.0, 0.0, 0.0, 1.0);
+    snow_value += processSnowFlake(2.0, -2.0, 0.0, 0.0, 1.0);
+    
+    snow_value += processSnowFlake(-1.0, -1.0, 0.0, 0.0, 1.0);
+    snow_value += processSnowFlake(0.0, -1.0, 0.0, 1.0, 1.0);
+    snow_value += processSnowFlake(1.0, -1.0, 0.0, 1.0, 1.0);
+    
+    snow_value += processSnowFlake(-2.0, 0.0, 0.0, 0.0, 1.0);
+    snow_value += processSnowFlake(-1.0, 0.0, 0.0, 0.0, 1.0);
+    snow_value += processSnowFlake(0.0, 0.0, 1.0, 1.0, 1.0);
+    snow_value += processSnowFlake(1.0, 0.0, 0.0, 1.0, 1.0);
+    snow_value += processSnowFlake(2.0, 0.0, 0.0, 0.0, 1.0);
+    
+    snow_value += processSnowFlake(-1.0, 1.0, 0.0, 0.0, 1.0);
+    snow_value += processSnowFlake(0.0, 1.0, 0.0, 0.0, 1.0);
+    snow_value += processSnowFlake(1.0, 1.0, 0.0, 0.0, 1.0);
+    
+    snow_value += processSnowFlake(-2.0, 2.0, 0.0, 0.0, 1.0);
+    snow_value += processSnowFlake(0.0, 2.0, 0.0, 0.0, 1.0);
+    snow_value += processSnowFlake(2.0, 2.0, 0.0, 0.0, 1.0);
 
-    for(x = 2.0; x < 4.0; x++) {
-        for(y = 1.0; y < 3.0; y++) {
-            vec4 snow_state = get(vec2(x - 2.0, y - 2.0));
-            int offset = int(y * 5.0 + x);
-            
-            snow_value1 = min(
-                snow_value1 +
-                snow_state.r * snow_flake_small[offset] +
-                snow_state.g * snow_flake_medium[offset],
-                1.0);
-        }
-    }
+    snow_value = ceil(min(snow_value, vec2(1.0)));
 
-    for(x = 0.0; x < 5.0; x++) {
-        for(y = 0.0; y < 5.0; y++) {
-            vec4 snow_state = get(vec2(x - 2.0, y - 2.0));
-            int offset = int(y * 5.0 + x);
-            
-            snow_value2 = min(
-                snow_value2 +
-                snow_state.a * snow_flake_small[offset] +
-                snow_state.b * snow_flake_large[offset],
-                1.0);
-        }
-    }
+    vec4 texture = texture(backgroundTexture, gl_FragCoord.xy / scale.xy);
 
-    vec4 snow1 = vec4(ceil(snow_value1));
-    vec4 snow2 = vec4(ceil(snow_value2));
-
-    vec4 texture1 = get_background(backgroundTextures[0], vec2(-10.0, 0.0), 1.0);
-    vec4 texture2 = get_background(backgroundTextures[1], vec2(-120.0, 0.0), 1.0);
-    vec4 texture3 = get_background(backgroundTextures[1], vec2(-256.0, 0.0), 2.0);
-
-    vec3 blendedColor = snow1.rgb;
-    blendedColor = mix(blendedColor, texture1.rgb, texture1.a);
-    blendedColor = mix(blendedColor, texture2.rgb, texture2.a);
-    blendedColor = mix(blendedColor, texture3.rgb, texture3.a);
-    blendedColor = snow2.a > 0.0 ? snow2.rgb : blendedColor;
+    vec3 blendedColor = snow_value.xxx;
+    blendedColor = mix(blendedColor, texture.rgb, texture.a);
+    blendedColor = mix(blendedColor, snow_value.yyy, snow_value.y);
 
     return vec4(blendedColor, 1.0);
 }
@@ -414,111 +404,93 @@ function textureFromImage(gl, image) {
     return tex;
 }
 ;
-(() => __awaiter(this, void 0, void 0, function* () {
-    const canvas = document.getElementById('canvas');
-    if (!canvas)
-        return;
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    const gl = canvas.getContext('webgl2', { alpha: false, antialias: false });
-    gl.disable(gl.DEPTH_TEST);
-    const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
-    const shaderCopyProgram = initShaderProgram(gl, vsSource, fsCopySource);
-    // Collect all the info needed to use the shader program.
-    // Look up which attribute our shader program is using
-    // for aVertexPosition and look up uniform locations.
-    const programInfo = {
-        program: shaderProgram,
-        attribLocations: {
-            quad: gl.getAttribLocation(shaderProgram, "in_quad"),
-        },
-        uniformLocations: {
-            scale: gl.getUniformLocation(shaderProgram, "scale"),
-            state: gl.getUniformLocation(shaderProgram, "state"),
-            random: gl.getUniformLocation(shaderProgram, "random"),
-            backgroundTextures: gl.getUniformLocation(shaderProgram, "backgroundTextures"),
-        },
-    };
-    const programCopyInfo = {
-        program: shaderCopyProgram,
-        attribLocations: {
-            quad: gl.getAttribLocation(shaderCopyProgram, "in_quad"),
-        },
-        uniformLocations: {
-            scale: gl.getUniformLocation(shaderCopyProgram, "scale"),
-            state: gl.getUniformLocation(shaderCopyProgram, "state"),
-            backgroundTextures: gl.getUniformLocation(shaderCopyProgram, "backgroundTextures"),
-        },
-    };
+function prepareVertices(gl, quad_uniform) {
     const positionBuffer = initPositionBuffer(gl);
-    const textureWidth = nearestPowerOf2(canvas.width);
-    const textureHeight = nearestPowerOf2(canvas.height);
-    // Double buffering texture, one for the previous state, one for the next state
-    // RGB contains the 3 layers snow
-    const state = [
-        texture(gl, textureWidth, textureHeight),
-        texture(gl, textureWidth, textureHeight)
-    ];
-    let currentTextureIndex = 0;
-    // Initialize snow, each white dot is a snow drawn by the fragment shader
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.enableVertexAttribArray(quad_uniform);
+    gl.vertexAttribPointer(quad_uniform, 2, gl.FLOAT, false, 0, 0);
+}
+function prepareViewport(gl, canvas) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.clearColor(0.0, 0.0, 0.0, 1.0); // Clear to black, fully opaque
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+}
+let snow_count = 0;
+function initializeSnowState(gl, canvas, state) {
     let rand = new Uint8Array(canvas.width * (canvas.height + 1) * 4);
-    const flake_sizes = [6, 2, 1];
-    const particle_count = canvas.width * canvas.height / 2000;
     for (let i = 0; i < rand.length; i += 4) {
         rand[i + 0] =
             ((Math.random() < 0.0006 ? 1 : 0) << 0) |
-                ((Math.random() < 0.0002 ? 3 : 0) << 1) |
+                ((Math.random() < 0.00015 ? 3 : 0) << 1) |
                 ((Math.random() < 0.0001 ? 1 : 0) << 3);
+        if (rand[i + 0] & 0x6) {
+            snow_count++;
+        }
         rand[i + 1] = 0;
         rand[i + 2] = 0;
         rand[i + 3] = 0;
     }
-    gl.bindTexture(gl.TEXTURE_2D, state[currentTextureIndex]);
+    gl.bindTexture(gl.TEXTURE_2D, state);
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, canvas.width, canvas.height + 1, gl.RGBA, gl.UNSIGNED_BYTE, rand);
-    const backgroundTexture = texture(gl, textureWidth, textureHeight);
-    let maison_image = yield getImageData("maison.png");
-    let sapin_image = yield getImageData("sapin.png");
-    let traineau_image = yield getImageData("traineau.png");
-    gl.activeTexture(gl.TEXTURE0 + 1);
-    const maisonTexture = textureFromImage(gl, maison_image);
-    gl.activeTexture(gl.TEXTURE0 + 2);
-    const sapinTexture = textureFromImage(gl, sapin_image);
-    gl.activeTexture(gl.TEXTURE0 + 3);
-    const traineauTexture = textureFromImage(gl, traineau_image);
-    const framebuffer = gl.createFramebuffer();
-    // Clear the canvas before we start drawing on it.
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.clearColor(0.0, 0.0, 0.0, 1.0); // Clear to black, fully opaque
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-    gl.enableVertexAttribArray(programInfo.attribLocations.quad);
-    gl.vertexAttribPointer(programInfo.attribLocations.quad, 2, gl.FLOAT, false, 0, 0);
-    gl.viewport(0, 0, canvas.width, canvas.height);
-    let frameCount = 0;
+}
+function prepareEnvironment(gl, backgroundTexture, framebuffer) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const shaderPreprocessEnvironmentProgram = initShaderProgram(gl, vsSource, fsPreprocessEnvironmentSource);
+        const programProcessEnvironmentInfo = {
+            program: shaderPreprocessEnvironmentProgram,
+            attribLocations: {
+                quad: gl.getAttribLocation(shaderPreprocessEnvironmentProgram, "in_quad"),
+            },
+            uniformLocations: {
+                backgroundTextures: gl.getUniformLocation(shaderPreprocessEnvironmentProgram, "backgroundTextures"),
+            },
+        };
+        let maison_image = yield getImageData("maison.png");
+        let sapin_image = yield getImageData("sapin.png");
+        gl.activeTexture(gl.TEXTURE0 + 1);
+        const maisonTexture = textureFromImage(gl, maison_image);
+        gl.activeTexture(gl.TEXTURE0 + 2);
+        const sapinTexture = textureFromImage(gl, sapin_image);
+        // Render to texture
+        gl.useProgram(programProcessEnvironmentInfo.program);
+        // Set the shader uniforms
+        gl.uniform1iv(programProcessEnvironmentInfo.uniformLocations.backgroundTextures, [1, 2]);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, backgroundTexture, 0);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.deleteTexture(maisonTexture);
+        gl.deleteTexture(sapinTexture);
+        gl.deleteProgram(programProcessEnvironmentInfo.program);
+    });
+}
+function monitorFPS(canvas, runtimeState) {
     let fpsElement = document.getElementById('fps');
     setInterval(function () {
-        let count = frameCount;
-        frameCount = 0;
-        fpsElement.textContent = "FPS: " + count + " " + window.devicePixelRatio + " " + canvas.width + " " + canvas.height;
+        let count = runtimeState.frameCount;
+        runtimeState.frameCount = 0;
+        fpsElement.textContent = "FPS: " + count + " " + window.devicePixelRatio + " " + canvas.width + " " + canvas.height + " " +
+            (canvas.width * canvas.height / snow_count);
     }, 1000);
-    let x = -1;
-    let y = -1;
+}
+function handleInteractions(canvas, runtimeState) {
     let generateSnowByMouseInterval = undefined;
     function handleMouseEvent(event) {
-        if (x != -1 || y != -1) {
+        if (runtimeState.x != -1 || runtimeState.y != -1) {
             return;
         }
         const rect = canvas.getBoundingClientRect();
         const localX = event.clientX - rect.left;
-        const localY = canvas.height - (event.clientY - rect.top);
-        x = localX;
-        y = localY;
+        const localY = window.innerHeight - (event.clientY - rect.top);
+        runtimeState.x = localX;
+        runtimeState.y = localY;
         if (generateSnowByMouseInterval !== undefined) {
             clearInterval(generateSnowByMouseInterval);
         }
         generateSnowByMouseInterval = setInterval(function () {
-            x = localX;
-            y = localY;
+            runtimeState.x = localX;
+            runtimeState.y = localY;
         }, 50);
     }
     canvas.addEventListener('mousedown', handleMouseEvent);
@@ -533,7 +505,7 @@ function textureFromImage(gl, image) {
         }
     });
     function handleTouchEvent(event) {
-        if (x != -1 || y != -1) {
+        if (runtimeState.x != -1 || runtimeState.y != -1) {
             return;
         }
         if (event.touches.length == 0)
@@ -541,15 +513,15 @@ function textureFromImage(gl, image) {
         const touchEvent = event.touches[0];
         const rect = canvas.getBoundingClientRect();
         const localX = touchEvent.clientX - rect.left;
-        const localY = canvas.height - (touchEvent.clientY - rect.top);
-        x = localX;
-        y = localY;
+        const localY = window.innerHeight - (touchEvent.clientY - rect.top);
+        runtimeState.x = localX;
+        runtimeState.y = localY;
         if (generateSnowByMouseInterval !== undefined) {
             clearInterval(generateSnowByMouseInterval);
         }
         generateSnowByMouseInterval = setInterval(function () {
-            x = localX;
-            y = localY;
+            runtimeState.x = localX;
+            runtimeState.y = localY;
         }, 50);
         event.preventDefault();
         event.stopPropagation();
@@ -568,38 +540,117 @@ function textureFromImage(gl, image) {
             clearInterval(generateSnowByMouseInterval);
         }
     });
+}
+(() => __awaiter(this, void 0, void 0, function* () {
+    const canvas = document.getElementById('canvas');
+    if (!canvas)
+        return;
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    while (canvas.width > 1024 && canvas.height > 512) {
+        canvas.width /= 2.0;
+        canvas.height /= 2.0;
+    }
+    canvas.style.width = window.innerWidth + "px";
+    canvas.style.height = window.innerHeight + "px";
+    const gl = canvas.getContext('webgl2', { alpha: false, antialias: false });
+    gl.disable(gl.DEPTH_TEST);
+    const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
+    const shaderCopyProgram = initShaderProgram(gl, vsSource, fsCopySource);
+    // Collect all the info needed to use the shader program.
+    // Look up which attribute our shader program is using
+    // for aVertexPosition and look up uniform locations.
+    const programInfo = {
+        program: shaderProgram,
+        attribLocations: {
+            quad: gl.getAttribLocation(shaderProgram, "in_quad"),
+        },
+        uniformLocations: {
+            scale: gl.getUniformLocation(shaderProgram, "scale"),
+            state: gl.getUniformLocation(shaderProgram, "state"),
+            random: gl.getUniformLocation(shaderProgram, "random"),
+            backgroundTexture: gl.getUniformLocation(shaderProgram, "backgroundTexture"),
+        },
+    };
+    const programCopyInfo = {
+        program: shaderCopyProgram,
+        attribLocations: {
+            quad: gl.getAttribLocation(shaderCopyProgram, "in_quad"),
+        },
+        uniformLocations: {
+            scale: gl.getUniformLocation(shaderCopyProgram, "scale"),
+            state: gl.getUniformLocation(shaderCopyProgram, "state"),
+            backgroundTexture: gl.getUniformLocation(shaderCopyProgram, "backgroundTexture"),
+        },
+    };
+    const framebuffer = gl.createFramebuffer();
+    const textureWidth = nearestPowerOf2(canvas.width);
+    const textureHeight = nearestPowerOf2(canvas.height);
+    prepareVertices(gl, programInfo.attribLocations.quad);
+    // Clear the canvas before we start drawing on it.
+    prepareViewport(gl, canvas);
+    // Double buffering texture, one for the previous state, one for the next state
+    // RGB contains the 3 layers snow
+    const state = [
+        texture(gl, textureWidth, textureHeight),
+        texture(gl, textureWidth, textureHeight)
+    ];
+    let currentTextureIndex = 0;
+    // Initialize snow, each white dot is a snow drawn by the fragment shader
+    initializeSnowState(gl, canvas, state[currentTextureIndex]);
+    const backgroundTexture = texture(gl, textureWidth, textureHeight);
+    yield prepareEnvironment(gl, backgroundTexture, framebuffer);
+    // Prepare textures for drawing main loop
+    let traineau_image = yield getImageData("traineau.png");
+    gl.activeTexture(gl.TEXTURE0 + 1);
+    gl.bindTexture(gl.TEXTURE_2D, backgroundTexture);
+    gl.activeTexture(gl.TEXTURE0 + 2);
+    textureFromImage(gl, traineau_image);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.useProgram(programInfo.program);
+    // Set the shader uniforms
+    gl.uniform4f(programInfo.uniformLocations.scale, textureWidth, textureHeight, canvas.width, canvas.height);
+    gl.uniform1i(programInfo.uniformLocations.state, 0);
+    gl.uniform1i(programInfo.uniformLocations.state, 0);
+    gl.uniform1i(programInfo.uniformLocations.backgroundTexture, 1);
+    gl.useProgram(programCopyInfo.program);
+    // Set the shader uniforms
+    gl.uniform4f(programCopyInfo.uniformLocations.scale, textureWidth, textureHeight, canvas.width, canvas.height);
+    gl.uniform1i(programCopyInfo.uniformLocations.state, 0);
+    gl.uniform1i(programCopyInfo.uniformLocations.backgroundTexture, 1);
+    let runtimeState = {
+        frameCount: 0,
+        x: -1,
+        y: -1,
+    };
+    monitorFPS(canvas, runtimeState);
+    handleInteractions(canvas, runtimeState);
     const fpsInterval = 1000 / 60.0;
     let expectedFrameDate = Date.now();
     function updateAnimation(timestamp) {
         let now = Date.now();
         if (now >= expectedFrameDate) {
             expectedFrameDate += Math.trunc((now - expectedFrameDate) / fpsInterval + 1) * fpsInterval;
-            frameCount++;
+            runtimeState.frameCount++;
             {
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, state[currentTextureIndex]);
-                if (x != -1 && y != -1) {
-                    gl.texSubImage2D(gl.TEXTURE_2D, 0, x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 128, 0, 0]));
-                    x = y = -1;
+                if (runtimeState.x != -1 && runtimeState.y != -1) {
+                    runtimeState.x = runtimeState.x / window.innerWidth * canvas.width;
+                    runtimeState.y = runtimeState.y / window.innerHeight * canvas.height;
+                    gl.texSubImage2D(gl.TEXTURE_2D, 0, runtimeState.x, runtimeState.y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 128, 0, 0]));
+                    runtimeState.x = runtimeState.y = -1;
                 }
                 currentTextureIndex = currentTextureIndex == 1 ? 0 : 1;
                 // Render to texture
                 gl.useProgram(programInfo.program);
                 // Set the shader uniforms
-                gl.uniform4f(programInfo.uniformLocations.scale, textureWidth, textureHeight, canvas.width, canvas.height);
-                gl.uniform1i(programInfo.uniformLocations.state, 0);
                 gl.uniform2f(programInfo.uniformLocations.random, Math.random(), Math.random());
-                gl.uniform1i(programInfo.uniformLocations.state, 0);
-                gl.uniform1iv(programInfo.uniformLocations.backgroundTextures, [1, 2, 3]);
                 gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
                 gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, state[currentTextureIndex], 0);
                 gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
                 // Render to screen
                 gl.useProgram(programCopyInfo.program);
-                // Set the shader uniforms
-                gl.uniform4f(programCopyInfo.uniformLocations.scale, textureWidth, textureHeight, canvas.width, canvas.height);
-                gl.uniform1i(programCopyInfo.uniformLocations.state, 0);
-                gl.uniform1iv(programCopyInfo.uniformLocations.backgroundTextures, [1, 2, 3]);
                 gl.bindFramebuffer(gl.FRAMEBUFFER, null);
                 gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
             }
