@@ -254,6 +254,7 @@ out vec4 fragColor;
 uniform sampler2D state;
 uniform sampler2D backgroundTexture;
 uniform vec4 scale;
+uniform float time;
 
 const vec2 bitEnc = vec2(1.,255.) / 2.0;
 const vec2 bitDec = 1./bitEnc;
@@ -292,7 +293,14 @@ vec2 processSnowFlake(float x, float y, float small, float medium, float large) 
         );
 }
 
-vec4 in_snow_flake() {
+vec4 apply_light(vec4 background_color, vec2 light_position, vec4 color, float radius, float power) {
+    vec2 distance = gl_FragCoord.xy - light_position.xy;
+    float distance_pow2 = dot(distance, distance);
+
+    return mix(background_color, color, radius / (1.0 + (distance_pow2 / power)));
+}
+
+vec4 blend_color() {
     vec2 snow_value;
     
     snow_value =  processSnowFlake(-2.0, -2.0, 0.0, 0.0, 1.0);
@@ -317,19 +325,65 @@ vec4 in_snow_flake() {
     snow_value += processSnowFlake(0.0, 2.0, 0.0, 0.0, 1.0);
     snow_value += processSnowFlake(2.0, 2.0, 0.0, 0.0, 1.0);
 
+    // If snow particule age > 0.0, then make it 1.0
     snow_value = ceil(min(snow_value, vec2(1.0)));
 
+    // Texture with images
     vec4 texture = texture(backgroundTexture, gl_FragCoord.xy / scale.xy);
+    // Add lights
+    vec4 texture_with_light = texture;
+
+    // 17 lights for house
+    float light_power_1 = 1.0 * (step(0.5, time));
+    float light_power_2 = 1.0 * (1.0 - step(0.5, time));
+
+    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 7.0 , 33.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_1, 6.0);
+    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 11.0, 33.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_2, 6.0);
+    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 16.0, 33.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_1, 6.0);
+    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 20.0, 33.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_2, 6.0);
+    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 25.0, 33.0), vec4(1.000, 0.000, 0.585, 1.0), light_power_1, 6.0);
+    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 29.0, 33.0), vec4(1.000, 0.000, 0.440, 1.0), light_power_2, 6.0);
+    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 33.0, 33.0), vec4(1.000, 0.533, 0.000, 1.0), light_power_1, 6.0);
+    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 38.0, 33.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_2, 6.0);
+    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 42.0, 33.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_1, 6.0);
+    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 47.0, 33.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_2, 6.0);
+    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 51.0, 33.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_1, 6.0);
+    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 56.0, 33.0), vec4(1.000, 0.000, 0.585, 1.0), light_power_2, 6.0);
+    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 60.0, 33.0), vec4(1.000, 0.000, 0.440, 1.0), light_power_1, 6.0);
+    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 64.0, 33.0), vec4(1.000, 0.533, 0.000, 1.0), light_power_2, 6.0);
+    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 69.0, 33.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_1, 6.0);
+    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 73.0, 33.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_2, 6.0);
+    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 78.0, 33.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_1, 6.0);
+    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 82.0, 33.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_2, 6.0);
+
+    // Sapin 1
+    light_power_1 = 1.0 * (step(0.5, fract(time + 0.7)));
+    light_power_2 = 1.0 * (1.0 - step(0.5, fract(time + 0.7)));
+    texture_with_light = apply_light(texture_with_light, vec2(120.0 + 39.0, 19.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_1, 120.0);
+    texture_with_light = apply_light(texture_with_light, vec2(120.0 + 92.0, 15.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_2, 120.0);
+    texture_with_light = apply_light(texture_with_light, vec2(120.0 + 69.0, 35.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_2, 120.0);
+    texture_with_light = apply_light(texture_with_light, vec2(120.0 + 72.0, 75.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_1, 120.0);
+    texture_with_light = apply_light(texture_with_light, vec2(120.0 + 57.0, 83.0), vec4(1.000, 0.000, 0.585, 1.0), light_power_2, 120.0);
+
+    // Sapin 2
+    light_power_1 = 1.0 * (step(0.5, fract(time + 0.4)));
+    light_power_2 = 1.0 * (1.0 - step(0.5, fract(time + 0.4)));
+    texture_with_light = apply_light(texture_with_light, vec2(256.0 + 39.0*2.0, 19.0*2.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_1, 240.0);
+    texture_with_light = apply_light(texture_with_light, vec2(256.0 + 92.0*2.0, 15.0*2.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_2, 240.0);
+    texture_with_light = apply_light(texture_with_light, vec2(256.0 + 69.0*2.0, 35.0*2.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_2, 240.0);
+    texture_with_light = apply_light(texture_with_light, vec2(256.0 + 72.0*2.0, 75.0*2.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_1, 240.0);
+    texture_with_light = apply_light(texture_with_light, vec2(256.0 + 57.0*2.0, 83.0*2.0), vec4(1.000, 0.000, 0.585, 1.0), light_power_2, 240.0);
+
 
     vec3 blendedColor = snow_value.xxx;
-    blendedColor = mix(blendedColor, texture.rgb, texture.a);
+    blendedColor = mix(blendedColor, texture_with_light.rgb, texture_with_light.a);
     blendedColor = mix(blendedColor, snow_value.yyy, snow_value.y);
 
     return vec4(blendedColor, 1.0);
 }
 
 void main() {
-    fragColor = in_snow_flake();
+    fragColor = blend_color();
     // fragColor = texture(state, (gl_FragCoord.xy) / scale.xy);
     // fragColor.a = 1.0;
 }
@@ -646,6 +700,7 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
         uniformLocations: {
             scale: gl.getUniformLocation(shaderCopyProgram, "scale"),
             state: gl.getUniformLocation(shaderCopyProgram, "state"),
+            time: gl.getUniformLocation(shaderCopyProgram, "time"),
             backgroundTexture: gl.getUniformLocation(shaderCopyProgram, "backgroundTexture"),
         },
     };
@@ -758,6 +813,7 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
 
                 // Render to screen
                 gl.useProgram(programCopyInfo.program);
+                gl.uniform1f(programCopyInfo.uniformLocations.time, (now % 2000) * (1.0 / 2000.0));
                 gl.bindFramebuffer(gl.FRAMEBUFFER, null);
                 gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
             }
