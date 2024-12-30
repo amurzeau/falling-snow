@@ -283,6 +283,9 @@ uniform sampler2D backgroundTexture;
 uniform vec4 scale;
 uniform float time;
 
+uniform sampler2D traineauTexture;
+uniform vec2 traineauPosition;
+
 const vec2 bitEnc = vec2(1.,255.) / 2.0;
 const vec2 bitDec = 1./bitEnc;
 vec2 EncodeFloatRGB (float v) {
@@ -401,7 +404,8 @@ vec4 blend_color() {
     texture_with_light = apply_light(texture_with_light, vec2(256.0 + 57.0*2.0, 83.0*2.0), vec4(1.000, 0.000, 0.585, 1.0), light_power_2, 240.0);
 
 
-    vec3 blendedColor = snow_value.xxx;
+    vec3 blendedColor = texelFetch(traineauTexture, ivec2(gl_FragCoord.xy - traineauPosition), 0).rgb;
+    blendedColor = mix(blendedColor, snow_value.xxx, snow_value.x);
     blendedColor = mix(blendedColor, texture_with_light.rgb, texture_with_light.a);
     blendedColor = mix(blendedColor, snow_value.yyy, snow_value.y);
 
@@ -693,7 +697,7 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    while(canvas.width > 1024 && canvas.height > 512) {
+    while(canvas.width > 512 && canvas.height > 512) {
         canvas.width /= 2.0;
         canvas.height /= 2.0;
     }
@@ -733,6 +737,8 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
             state: gl.getUniformLocation(shaderCopyProgram, "state"),
             time: gl.getUniformLocation(shaderCopyProgram, "time"),
             backgroundTexture: gl.getUniformLocation(shaderCopyProgram, "backgroundTexture"),
+            traineauTexture: gl.getUniformLocation(shaderCopyProgram, "traineauTexture"),
+            traineauPosition: gl.getUniformLocation(shaderCopyProgram, "traineauPosition"),
         },
     };
 
@@ -798,19 +804,21 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
     );
     gl.uniform1i(programCopyInfo.uniformLocations.state, 0);
     gl.uniform1i(programCopyInfo.uniformLocations.backgroundTexture, 1);
+    gl.uniform1i(programCopyInfo.uniformLocations.traineauTexture, 2);
 
 
     let runtimeState = {
         frameCount: 0,
         x: -1,
         y: -1,
+        traineauPosition: canvas.width,
     }
     monitorFPS(canvas, runtimeState);
 
     handleInteractions(canvas, runtimeState);
     
 
-    const fpsInterval = 1000 / 60.0;
+    const fpsInterval = 1000 / 61.0;
     let expectedFrameDate = Date.now();
 
     function updateAnimation(timestamp: DOMHighResTimeStamp) {
@@ -846,8 +854,13 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
                 // Render to screen
                 gl.useProgram(programCopyInfo.program);
                 gl.uniform1f(programCopyInfo.uniformLocations.time, (now % 2000) * (1.0 / 2000.0));
+                gl.uniform2f(programCopyInfo.uniformLocations.traineauPosition, runtimeState.traineauPosition, canvas.height - 100.0);
                 gl.bindFramebuffer(gl.FRAMEBUFFER, null);
                 gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+                runtimeState.traineauPosition -= 1;
+                if (runtimeState.traineauPosition < -traineau_image.width)
+                    runtimeState.traineauPosition = canvas.width * 2;
             }
         }
 
