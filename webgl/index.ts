@@ -411,7 +411,7 @@ vec4 blend_color() {
 
     // Smoke
     vec4 texel = texture(state, gl_FragCoord.xy / scale.xy);
-    blendedColor = mix(blendedColor, vec3(0.5, 0.5, 0.5), (texel.a));
+    blendedColor = mix(blendedColor, vec3(0.8), (texel.a));
 
     return vec4(blendedColor, 1.0);
 }
