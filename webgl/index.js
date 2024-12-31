@@ -565,6 +565,9 @@ function monitorFPS(canvas, runtimeState) {
 function handleInteractions(canvas, runtimeState) {
     let generateSnowByMouseInterval = undefined;
     function handleMouseEvent(event) {
+        if (!(event.buttons & 1)) {
+            return;
+        }
         if (runtimeState.x != -1 || runtimeState.y != -1) {
             return;
         }
@@ -587,11 +590,7 @@ function handleInteractions(canvas, runtimeState) {
             clearInterval(generateSnowByMouseInterval);
         }
     });
-    canvas.addEventListener('mousemove', function (event) {
-        if (event.buttons & 1) {
-            handleMouseEvent(event);
-        }
-    });
+    canvas.addEventListener('mousemove', handleMouseEvent);
     function handleTouchEvent(event) {
         if (runtimeState.x != -1 || runtimeState.y != -1) {
             return;
