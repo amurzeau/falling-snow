@@ -209,7 +209,7 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
     for(let i = 0; i < 6; i++) {
         let poisson = new glutils.Poisson();
         let scale = Math.random() * 0.1 + 0.01;
-        poisson.position = [Math.random(), Math.random(), scale, scale];
+        poisson.position = [Math.random()*0.9, Math.random()*0.9, scale, scale];
         poissonObjectsFrontBulles.poissons.push(poisson);
     }
 

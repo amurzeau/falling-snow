@@ -91,7 +91,7 @@ export class Poisson {
                     }
                 }
                 else {
-                    this.nextUpdateIn = 0;
+                    this.state = PoissonState.MovingBackward;
                 }
                 break;
             case PoissonState.MovingBackward:
@@ -103,7 +103,7 @@ export class Poisson {
                     }
                 }
                 else {
-                    this.nextUpdateIn = 0;
+                    this.state = PoissonState.MovingForward;
                 }
                 break;
             default:
