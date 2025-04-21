@@ -76,7 +76,9 @@ export class GL2DBulles {
     }
 
     addBulle(x: number, y: number, scale: number) {
-        this.positions.push([x, y, scale, scale]);
+        if(this.positions.length < 1000) {
+            this.positions.push([x, y, scale, scale]);
+        }
     }
 
 };
@@ -86,7 +88,7 @@ enum PoissonState {
     MovingBackward,
     Idle,
 }
-let poissonStatesNumber = Object.keys(PoissonState).length;
+let poissonStatesNumber = 3;
 
 export class Poisson {
     public position: vec4;
@@ -119,7 +121,7 @@ export class Poisson {
                 }
                 break;
             
-            case PoissonState.Idle:
+            default:
                 if(Math.random() < 0.005) {
                     bulleObjects.addBulle(this.position[0] + this.position[2]*0.9, this.position[1] + this.position[3] / 2, this.position[3] / 5);
                 }
@@ -127,8 +129,12 @@ export class Poisson {
         }
         this.nextUpdateIn = this.nextUpdateIn - 1;
         if(this.nextUpdateIn <= 0) {
-            this.nextUpdateIn = (Math.random() * 5 + 5) * 60;
             this.state = Math.floor(Math.random() * poissonStatesNumber) as PoissonState;
+            if(this.state == PoissonState.Idle) {
+                this.nextUpdateIn = (Math.random() * 3) * 60;
+            } else {
+                this.nextUpdateIn = (Math.random() * 5 + 5) * 60;
+            }
         }
     }
 }

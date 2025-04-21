@@ -1,3 +1,4 @@
+// <reference path='./sensors.d.ts'/>
 import * as glutils from './gl-utils.js'
 import * as shaders from './shaders.js'
 
@@ -7,11 +8,33 @@ function monitorFPS(canvas: HTMLCanvasElement, runtimeState) {
     setInterval(function () {
         let count = runtimeState.frameCount;
         runtimeState.frameCount = 0;
-        fpsElement.textContent = "FPS: " + count + " " + window.devicePixelRatio + " " + canvas.width + " " + canvas.height;
+        fpsElement.textContent = "FPS: " + count + " " + window.devicePixelRatio + " " + canvas.width + " " + canvas.height + " " + runtimeState.bullesObjects.positions.length;
     }, 1000);
 }
 
-let fullscreen_asked = false;
+
+function handleGravity(runtimeState) {
+    if (! ('GravitySensor' in window)) {
+        console.log("No gravity sensor");
+        return;
+    }
+
+    let gravitySensor = new GravitySensor({ frequency: 10 });
+
+    gravitySensor.onerror = (event) => {
+        // Handle runtime errors.
+        if (event.error.name === 'NotAllowedError') {
+            console.log('Permission to access sensor was denied.');
+        } else if (event.error.name === 'NotReadableError') {
+            console.log('Cannot connect to the sensor.');
+        }
+    };
+    gravitySensor.onreading = (e) => {
+        runtimeState.gravity = [(-gravitySensor.y) / 9.81, (gravitySensor.x + gravitySensor.z) / 9.81];
+    };
+    gravitySensor.start();
+}
+
 function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
     let generateSnowByMouseInterval: number | undefined = undefined;
 
@@ -19,11 +42,6 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
         if(!(event.buttons & 1)) {
             return;
         }
-        //if(!fullscreen_asked) {
-        //    canvas.requestFullscreen();
-        //    fullscreen_asked = true;
-        //}
-
         if(runtimeState.x != -1 || runtimeState.y != -1) {
             return;
         }
@@ -58,11 +76,6 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
 
         if(event.touches.length == 0)
             return;
-
-        if(!fullscreen_asked) {
-            canvas.requestFullscreen();
-            fullscreen_asked = true;
-        }
 
         if(runtimeState.x != -1 || runtimeState.y != -1) {
             return;
@@ -107,8 +120,6 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
     const canvas = document.getElementById('canvas') as HTMLCanvasElement;
     if (!canvas)
         return;
-
-    fullscreen_asked = false;
 
     // Adjust canvas size to an appropriate zoom to avoid too much pixel to be drawn by fragment shader
     canvas.width = window.innerWidth;
@@ -170,9 +181,6 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
     backgroundObject.size = [1.0, 1.0];
     backgroundObject.texture = backgroundTexture;
 
-    let objects: glutils.GL2DObject[]  = [];
-    objects.push(backgroundObject);
-
     let poissonObjectsBehindBulles = await glutils.GL2DPoissons.create("poisson.png");
     for(let i = 0; i < 6; i++) {
         let poisson = new glutils.Poisson();
@@ -207,10 +215,13 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
         frameCount: 0,
         x: -1,
         y: -1,
+        gravity: [0, 1],
+        bullesObjects: bullesObjects
     };
     monitorFPS(canvas, runtimeState);
 
     handleInteractions(canvas, runtimeState);
+    handleGravity(runtimeState);
 
     let bulleLocations: vec3[] = [
         // Purple
@@ -224,13 +235,12 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
         [0.812, 0.310, 0.025],
         [0.850, 0.232, 0.015],
     ];
-    
-    
 
     const fpsInterval = 1000 / 61.0;
     let expectedFrameDate = Date.now();
 
-    let fast_fps_mode = true;
+    let fast_fps_mode = false;
+    let bulleSpeed = 0.0005;
 
     function updateAnimation(timestamp: DOMHighResTimeStamp) {
         let now = Date.now();
@@ -246,24 +256,23 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
 
             runtimeState.frameCount++;
             {
-                //gl.activeTexture(gl.TEXTURE0);
-                //gl.bindTexture(gl.TEXTURE_2D, state[currentTextureIndex]);
-                //if(runtimeState.x != -1 && runtimeState.y != -1) {
-                //    runtimeState.x = runtimeState.x / window.innerWidth * canvas.width;
-                //    runtimeState.y = runtimeState.y / window.innerHeight * canvas.height;
-                //    gl.texSubImage2D(gl.TEXTURE_2D, 0, runtimeState.x, runtimeState.y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 128, 0, 0]));
-                //    runtimeState.x = runtimeState.y = -1;
-                //}
-                //currentTextureIndex = currentTextureIndex == 1 ? 0 : 1;
+                if(runtimeState.x != -1 && runtimeState.y != -1) {
+                    runtimeState.x = runtimeState.x / window.innerWidth;
+                    runtimeState.y = runtimeState.y / window.innerHeight;
+                    let bulleSize = 0.02;
+                    bullesObjects.addBulle(runtimeState.x - bulleSize, runtimeState.y - bulleSize, bulleSize*2);
 
-                // Render objects
-                for(let object of objects) {
-                    object.bindObject(programInfo.uniformLocations.position);
-                    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+                    runtimeState.x = -1;
+                    runtimeState.y = -1;
                 }
 
+                // Render objects
+                backgroundObject.bindObject(programInfo.uniformLocations.position);
+                gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
                 poissonObjectsBehindBulles.drawObjects(programInfo.uniformLocations.position, bullesObjects);
-                bullesObjects.drawObjects(programInfo.uniformLocations.position, [0, 0.0005]);
+                
+                bullesObjects.drawObjects(programInfo.uniformLocations.position, [runtimeState.gravity[0] * bulleSpeed, runtimeState.gravity[1] * bulleSpeed]);
                 poissonObjectsFrontBulles.drawObjects(programInfo.uniformLocations.position, bullesObjects);
             }
         }
