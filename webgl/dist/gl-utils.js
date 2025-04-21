@@ -7,7 +7,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-/// <reference path='gl-matrix/types.d.ts'/>
+/// <reference path='./gl-matrix/types.d.ts'/>
 import * as vec2 from './gl-matrix/vec2.js';
 import * as shaders from './shaders.js';
 let gl;
@@ -16,18 +16,22 @@ export function initOpenGL(input_canvas) {
     gl = input_canvas.getContext('webgl', { alpha: false, antialias: false });
     canvas = input_canvas;
 }
-class GL2DObject {
+export class GL2DObject {
+    createGL2DObject(image) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let image_html = yield getImageData(image);
+            let obj = new GL2DObject();
+            obj.position = vec2.create();
+            obj.size = vec2.create();
+            obj.texture = textureFromImage(image_html);
+        });
+    }
+    bindObject(positionUniform) {
+        gl.bindTexture(gl.TEXTURE0, this.texture);
+        gl.uniform4f(positionUniform, this.position[0], this.position[1], this.size[0], this.size[1]);
+    }
 }
 ;
-export function createGL2DObject(image) {
-    return __awaiter(this, void 0, void 0, function* () {
-        let image_html = yield getImageData(image);
-        let obj = new GL2DObject();
-        obj.position = vec2.create();
-        obj.size = vec2.create();
-        obj.texture = textureFromImage(image_html);
-    });
-}
 export function addImageProcess(src) {
     return new Promise((resolve, reject) => {
         let img = new Image();

@@ -1,6 +1,3 @@
-/// <reference path='gl-matrix/types.d.ts'/>
-import * as vec2 from './gl-matrix/vec2'
-
 import * as glutils from './gl-utils.js'
 import * as shaders from './shaders.js'
 

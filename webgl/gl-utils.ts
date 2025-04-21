@@ -1,5 +1,5 @@
 
-/// <reference path='gl-matrix/types.d.ts'/>
+/// <reference path='./gl-matrix/types.d.ts'/>
 import * as vec2 from './gl-matrix/vec2.js'
 import * as shaders from './shaders.js'
 
@@ -13,20 +13,25 @@ export function initOpenGL(input_canvas: HTMLCanvasElement) {
 }
 
 
-class GL2DObject {
+export class GL2DObject {
     public position: vec2;
     public size: vec2;
     public texture: WebGLTexture;
+
+    async createGL2DObject(image: string) {
+        let image_html: HTMLImageElement = await getImageData(image);
+    
+        let obj = new GL2DObject();
+        obj.position = vec2.create();
+        obj.size = vec2.create();
+        obj.texture = textureFromImage(image_html);
+    }
+
+    bindObject(positionUniform: WebGLUniformLocation) {
+        gl.bindTexture(gl.TEXTURE0, this.texture);
+        gl.uniform4f(positionUniform, this.position[0], this.position[1], this.size[0], this.size[1]);
+    }
 };
-
-export async function createGL2DObject(image: string) {
-    let image_html: HTMLImageElement = await getImageData(image);
-
-    let obj = new GL2DObject();
-    obj.position = vec2.create();
-    obj.size = vec2.create();
-    obj.texture = textureFromImage(image_html);
-}
 
 
 export function addImageProcess(src: string): Promise<HTMLImageElement> {
