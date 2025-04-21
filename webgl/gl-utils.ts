@@ -24,7 +24,7 @@ export class GL2DObject {
     public size: vec2;
     public texture: WebGLTexture;
 
-    static async createGL2DObject(image: string, x: number, y: number, width: number, height: number) {
+    static async create(image: string, x: number, y: number, width: number, height: number) {
         let image_html: HTMLImageElement = await getImageData(image);
     
         let obj = new GL2DObject();
@@ -37,7 +37,124 @@ export class GL2DObject {
 
     bindObject(positionUniform: WebGLUniformLocation) {
         gl.bindTexture(gl.TEXTURE_2D, this.texture);
-        gl.uniform4f(positionUniform, -this.position[0], -this.position[1], 1/this.size[0], 1/this.size[1]);
+        gl.uniform4f(positionUniform, this.position[0], this.position[1], this.size[0], this.size[1]);
+    }
+};
+
+
+export class GL2DBulles {
+    public positions: vec4[];
+    public texture: WebGLTexture;
+
+    static async create(image: string) {
+        let image_html: HTMLImageElement = await getImageData(image);
+    
+        let obj = new GL2DBulles();
+        obj.positions = [];
+        obj.texture = textureFromImage(image_html);
+
+        return obj;
+    }
+
+    drawObjects(positionUniform: WebGLUniformLocation, upVector: vec2) {
+        gl.bindTexture(gl.TEXTURE_2D, this.texture);
+        for(let i = 0; i < this.positions.length;) {
+            let position = this.positions[i];
+            position[0] += upVector[0];
+            position[1] += upVector[1];
+
+            // Remove if out of bounds
+            if(position[0] + position[2] < 0 || position[1] + position[3] < 0 || position[0] >= 1 || position[1] >= 1) {
+                this.positions.splice(i, 1);
+                continue;
+            }
+            
+            gl.uniform4f(positionUniform, position[0], position[1], position[2], position[3]);
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+            i++;
+        }
+    }
+
+    addBulle(x: number, y: number, scale: number) {
+        this.positions.push([x, y, scale, scale]);
+    }
+
+};
+
+enum PoissonState {
+    MovingForward,
+    MovingBackward,
+    Idle,
+}
+let poissonStatesNumber = Object.keys(PoissonState).length;
+
+export class Poisson {
+    public position: vec4;
+    public state: PoissonState = PoissonState.MovingForward;
+    
+    nextUpdateIn: number = 0;
+
+    update(bulleObjects: GL2DBulles) {
+        switch(this.state) {
+            case PoissonState.MovingForward:
+                if(this.position[0] + this.position[2] < 1) {
+                    this.position[0] += 0.0005;
+                    if(this.position[2] != this.position[3]) {
+                        this.position[2] = this.position[3];
+                        this.position[0] -= this.position[2];
+                    }
+                } else {
+                    this.nextUpdateIn = 0;
+                }
+                break;
+            case PoissonState.MovingBackward:
+                if(this.position[0] + this.position[2] > 0) {
+                    this.position[0] -= 0.0005;
+                    if(this.position[2] == this.position[3]) {
+                        this.position[2] = -this.position[3];
+                        this.position[0] -= this.position[2];
+                    }
+                } else {
+                    this.nextUpdateIn = 0;
+                }
+                break;
+            
+            case PoissonState.Idle:
+                if(Math.random() < 0.005) {
+                    bulleObjects.addBulle(this.position[0] + this.position[2]*0.9, this.position[1] + this.position[3] / 2, this.position[3] / 5);
+                }
+                break;
+        }
+        this.nextUpdateIn = this.nextUpdateIn - 1;
+        if(this.nextUpdateIn <= 0) {
+            this.nextUpdateIn = (Math.random() * 5 + 5) * 60;
+            this.state = Math.floor(Math.random() * poissonStatesNumber) as PoissonState;
+        }
+    }
+}
+
+
+export class GL2DPoissons {
+    public poissons: Poisson[];
+    public texture: WebGLTexture;
+
+    static async create(image: string) {
+        let image_html: HTMLImageElement = await getImageData(image);
+    
+        let obj = new GL2DPoissons();
+        obj.poissons = [];
+        obj.texture = textureFromImage(image_html);
+
+        return obj;
+    }
+
+    drawObjects(positionUniform: WebGLUniformLocation, bulleObjects: GL2DBulles) {
+        gl.bindTexture(gl.TEXTURE_2D, this.texture);
+        for(let poisson of this.poissons) {
+            poisson.update(bulleObjects);
+            gl.uniform4f(positionUniform, poisson.position[0], poisson.position[1], poisson.position[2], poisson.position[3]);
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        }
     }
 };
 

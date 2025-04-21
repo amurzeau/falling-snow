@@ -16,7 +16,7 @@ export const vsSource = `#version 100
         -1.0,  -1.0,   0.0,  1.0);
 
     void main() {
-        vec2 vertice = (in_quad / position.zw - position.xy);
+        vec2 vertice = (in_quad * position.zw + position.xy);
         gl_Position = projection * vec4(vertice, 0.0, 1.0);
         vTexCoord = in_quad;
     }

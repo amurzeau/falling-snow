@@ -59,10 +59,10 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
         if(event.touches.length == 0)
             return;
 
-        //if(!fullscreen_asked) {
-        //    canvas.requestFullscreen();
-        //    fullscreen_asked = true;
-        //}
+        if(!fullscreen_asked) {
+            canvas.requestFullscreen();
+            fullscreen_asked = true;
+        }
 
         if(runtimeState.x != -1 || runtimeState.y != -1) {
             return;
@@ -107,6 +107,8 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
     const canvas = document.getElementById('canvas') as HTMLCanvasElement;
     if (!canvas)
         return;
+
+    fullscreen_asked = false;
 
     // Adjust canvas size to an appropriate zoom to avoid too much pixel to be drawn by fragment shader
     canvas.width = window.innerWidth;
@@ -171,9 +173,22 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
     let objects: glutils.GL2DObject[]  = [];
     objects.push(backgroundObject);
 
-    let poissonObject = await glutils.GL2DObject.createGL2DObject("poisson.png", 0.02, 0.5, 0.05, 0.05);
-    objects.push(poissonObject);
+    let poissonObjectsBehindBulles = await glutils.GL2DPoissons.create("poisson.png");
+    for(let i = 0; i < 6; i++) {
+        let poisson = new glutils.Poisson();
+        let scale = Math.random() * 0.1 + 0.01;
+        poisson.position = [Math.random(), Math.random(), scale, scale];
+        poissonObjectsBehindBulles.poissons.push(poisson);
+    }
+    let poissonObjectsFrontBulles = await glutils.GL2DPoissons.create("poisson.png");
+    for(let i = 0; i < 6; i++) {
+        let poisson = new glutils.Poisson();
+        let scale = Math.random() * 0.1 + 0.01;
+        poisson.position = [Math.random(), Math.random(), scale, scale];
+        poissonObjectsFrontBulles.poissons.push(poisson);
+    }
 
+    let bullesObjects = await glutils.GL2DBulles.create("bulle.png");
 
 
     // Clear the canvas before we start drawing on it.
@@ -196,15 +211,38 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
     monitorFPS(canvas, runtimeState);
 
     handleInteractions(canvas, runtimeState);
+
+    let bulleLocations: vec3[] = [
+        // Purple
+        [0.170, 0.210, 0.02],
+        [0.215, 0.185, 0.01],
+        [0.232, 0.152, 0.01],
+
+        // Orange
+        [0.745, 0.170, 0.015],
+        [0.760, 0.245, 0.027],
+        [0.812, 0.310, 0.025],
+        [0.850, 0.232, 0.015],
+    ];
+    
     
 
     const fpsInterval = 1000 / 61.0;
     let expectedFrameDate = Date.now();
 
+    let fast_fps_mode = true;
+
     function updateAnimation(timestamp: DOMHighResTimeStamp) {
         let now = Date.now();
-        if (now >= expectedFrameDate) {
+        if (now >= expectedFrameDate || fast_fps_mode) {
             expectedFrameDate += Math.trunc((now - expectedFrameDate) / fpsInterval + 1) * fpsInterval;
+
+            // Generate fixed bulle
+            for(let bulleLocation of bulleLocations) {
+                if(Math.random() < 0.005) {
+                    bullesObjects.addBulle(bulleLocation[0], bulleLocation[1], bulleLocation[2]);
+                }
+            }
 
             runtimeState.frameCount++;
             {
@@ -224,12 +262,19 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
                     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
                 }
 
-                poissonObject.position[0] += 0.01;
-
+                poissonObjectsBehindBulles.drawObjects(programInfo.uniformLocations.position, bullesObjects);
+                bullesObjects.drawObjects(programInfo.uniformLocations.position, [0, 0.0005]);
+                poissonObjectsFrontBulles.drawObjects(programInfo.uniformLocations.position, bullesObjects);
             }
         }
 
-        window.requestAnimationFrame(updateAnimation);
+        if(fast_fps_mode)
+            setTimeout(updateAnimation, 1);
+        else
+            window.requestAnimationFrame(updateAnimation);
     }
-    window.requestAnimationFrame(updateAnimation);
+    if(fast_fps_mode)
+        setTimeout(updateAnimation, 1);
+    else
+        window.requestAnimationFrame(updateAnimation);
 })();
