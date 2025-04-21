@@ -3,9 +3,10 @@
     "compilerOptions": { 
            "sourceMap": true, 
            "target": "es6",
+           "module": "ES6"
      }, 
      "include": [ 
-           "index.ts"
+           "*.ts"
      ], 
      "exclude": [ 
            "node_modules",
