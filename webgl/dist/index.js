@@ -109,7 +109,6 @@ function handleInteractions(canvas, runtimeState) {
     const gl = canvas.getContext('webgl', { alpha: false, antialias: false });
     gl.disable(gl.DEPTH_TEST);
     const shaderProgram = glutils.initShaderProgram(shaders.vsSource, shaders.fsScreen);
-    const shaderCopyProgram = glutils.initShaderProgram(shaders.vsSource, shaders.fsScreen);
     // Collect all the info needed to use the shader program.
     // Look up which attribute our shader program is using
     // for aVertexPosition and look up uniform locations.
@@ -120,19 +119,7 @@ function handleInteractions(canvas, runtimeState) {
         },
         uniformLocations: {
             position: gl.getUniformLocation(shaderProgram, "position"),
-            scale: gl.getUniformLocation(shaderProgram, "scale"),
             backgroundTexture: gl.getUniformLocation(shaderProgram, "backgroundTexture"),
-        },
-    };
-    const programCopyInfo = {
-        program: shaderCopyProgram,
-        attribLocations: {
-            quad: gl.getAttribLocation(shaderCopyProgram, "in_quad"),
-        },
-        uniformLocations: {
-            position: gl.getUniformLocation(shaderCopyProgram, "position"),
-            scale: gl.getUniformLocation(shaderCopyProgram, "scale"),
-            backgroundTexture: gl.getUniformLocation(shaderCopyProgram, "backgroundTexture"),
         },
     };
     const framebuffer = gl.createFramebuffer();
@@ -153,29 +140,17 @@ function handleInteractions(canvas, runtimeState) {
     // Prepare viewport for render to backgroundTexture texture
     glutils.prepareViewport(canvas.width, canvas.height);
     yield glutils.prepareEnvironment(backgroundTexture, framebuffer);
+    let backgroundObject = new glutils.GL2DObject();
+    backgroundObject.position = [0.0, 1.0];
+    backgroundObject.size = [0.0, 1.0];
+    backgroundObject.texture = backgroundTexture;
     // Clear the canvas before we start drawing on it.
     glutils.prepareViewport(canvas.width, canvas.height);
     // Select active texture index
     gl.activeTexture(gl.TEXTURE0);
-    // Bind texture to active texture slot 0
-    gl.bindTexture(gl.TEXTURE_2D, backgroundTexture);
     gl.useProgram(programInfo.program);
     // Set the shader uniforms
-    gl.uniform4f(programInfo.uniformLocations.position, 0, 1, 0, 1);
-    gl.uniform4f(programInfo.uniformLocations.scale, textureWidth, textureHeight, canvas.width, canvas.height);
-    //gl.uniform1i(
-    //    programInfo.uniformLocations.state,
-    //    0,
-    //);
-    //gl.uniform1i(programInfo.uniformLocations.state, 0);
     gl.uniform1i(programInfo.uniformLocations.backgroundTexture, 0); // Background texture is in texture slot 0
-    gl.useProgram(programCopyInfo.program);
-    // Set the shader uniforms
-    gl.uniform4f(programCopyInfo.uniformLocations.position, 0, 1, 0, 1);
-    gl.uniform4f(programCopyInfo.uniformLocations.scale, textureWidth, textureHeight, canvas.width, canvas.height);
-    //gl.uniform1i(programCopyInfo.uniformLocations.state, 0);
-    //gl.uniform1i(programCopyInfo.uniformLocations.traineauTexture, 2);
-    gl.uniform1i(programCopyInfo.uniformLocations.backgroundTexture, 0);
     let runtimeState = {
         frameCount: 0,
         x: -1,
@@ -200,24 +175,11 @@ function handleInteractions(canvas, runtimeState) {
                 //    runtimeState.x = runtimeState.y = -1;
                 //}
                 //currentTextureIndex = currentTextureIndex == 1 ? 0 : 1;
-                // Render to texture
+                // Render objects
                 gl.useProgram(programInfo.program);
-                // Set the shader uniforms
-                //gl.uniform2f(
-                //    programInfo.uniformLocations.random,
-                //    Math.random(),
-                //    Math.random(),
-                //);
-                //gl.uniform1f(programInfo.uniformLocations.time, (now % 1000) / 1000.0);
                 gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-                //gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, state[currentTextureIndex], 0);
+                backgroundObject.bindObject(programInfo.uniformLocations.position);
                 gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-                // Render to screen
-                //gl.useProgram(programCopyInfo.program);
-                //gl.uniform1f(programCopyInfo.uniformLocations.time, (now % 2000) * (1.0 / 2000.0));
-                //gl.uniform2f(programCopyInfo.uniformLocations.traineauPosition, runtimeState.traineauPosition, canvas.height - 100.0);
-                //gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-                //gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
             }
         }
         window.requestAnimationFrame(updateAnimation);

@@ -60,6 +60,7 @@ uniform sampler2D backgroundTexture;
 
 void main() {
     gl_FragColor = texture2D(backgroundTexture, vTexCoord.xy);
+    //gl_FragColor = vec4(vTexCoord.xy, 0.0, 1.0);
 }
-  `;
+`;
 //# sourceMappingURL=shaders.js.map

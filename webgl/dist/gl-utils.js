@@ -23,11 +23,12 @@ export class GL2DObject {
             let obj = new GL2DObject();
             obj.position = vec2.create();
             obj.size = vec2.create();
+            vec2.copy(obj.size, [1, 1]);
             obj.texture = textureFromImage(image_html);
         });
     }
     bindObject(positionUniform) {
-        gl.bindTexture(gl.TEXTURE0, this.texture);
+        gl.bindTexture(gl.TEXTURE_2D, this.texture);
         gl.uniform4f(positionUniform, this.position[0], this.position[1], this.size[0], this.size[1]);
     }
 }
