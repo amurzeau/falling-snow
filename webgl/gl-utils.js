@@ -11,6 +11,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 import * as vec2 from './gl-matrix/vec2.js';
 import * as shaders from './shaders.js';
 let gl;
+let canvas;
+export function initOpenGL(input_canvas) {
+    gl = input_canvas.getContext('webgl', { alpha: false, antialias: false });
+    canvas = input_canvas;
+}
 class GL2DObject {
 }
 ;
@@ -20,11 +25,8 @@ export function createGL2DObject(image) {
         let obj = new GL2DObject();
         obj.position = vec2.create();
         obj.size = vec2.create();
-        obj.texture = textureFromImage(gl, image_html);
+        obj.texture = textureFromImage(image_html);
     });
-}
-export function initOpenGL(canvas) {
-    gl = canvas.getContext('webgl', { alpha: false, antialias: false });
 }
 export function addImageProcess(src) {
     return new Promise((resolve, reject) => {
@@ -47,7 +49,7 @@ export function getImageData(image) {
 // creates a shader of the given type, uploads the source and
 // compiles it.
 //
-export function loadShader(gl, type, source) {
+export function loadShader(type, source) {
     const shader = gl.createShader(type);
     // Send the source to the shader object
     gl.shaderSource(shader, source);
@@ -61,9 +63,9 @@ export function loadShader(gl, type, source) {
     }
     return shader;
 }
-export function initShaderProgram(gl, vsSource, fsSource) {
-    const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vsSource);
-    const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fsSource);
+export function initShaderProgram(vsSource, fsSource) {
+    const vertexShader = loadShader(gl.VERTEX_SHADER, vsSource);
+    const fragmentShader = loadShader(gl.FRAGMENT_SHADER, fsSource);
     // Create the shader program
     const shaderProgram = gl.createProgram();
     gl.attachShader(shaderProgram, vertexShader);
@@ -76,7 +78,7 @@ export function initShaderProgram(gl, vsSource, fsSource) {
     }
     return shaderProgram;
 }
-export function initPositionBuffer(gl) {
+export function initPositionBuffer() {
     // Create a buffer for the square's positions.
     const positionBuffer = gl.createBuffer();
     // Select the positionBuffer as the one to apply buffer
@@ -99,7 +101,7 @@ export function initPositionBuffer(gl) {
 export function nearestPowerOf2(n) {
     return 1 << 32 - Math.clz32(n);
 }
-export function texture(gl, width, height) {
+export function texture(width, height) {
     var tex = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -110,7 +112,7 @@ export function texture(gl, width, height) {
     return tex;
 }
 ;
-export function textureFromImage(gl, image) {
+export function textureFromImage(image) {
     var tex = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
@@ -122,20 +124,20 @@ export function textureFromImage(gl, image) {
     return tex;
 }
 ;
-export function prepareVertices(gl, quad_uniform) {
-    const positionBuffer = initPositionBuffer(gl);
+export function prepareVertices(quad_uniform) {
+    const positionBuffer = initPositionBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
     gl.enableVertexAttribArray(quad_uniform);
     gl.vertexAttribPointer(quad_uniform, 2, gl.FLOAT, false, 0, 0);
 }
-export function prepareViewport(gl, width, height) {
+export function prepareViewport(width, height) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.clearColor(0.0, 0.0, 0.0, 1.0); // Clear to black, fully opaque
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.viewport(0, 0, width, height);
 }
 let snow_count = 0;
-export function initializeSnowState(gl, canvas, state) {
+export function initializeSnowState(state) {
     let rand = new Uint8Array(canvas.width * (canvas.height + 1) * 4);
     for (let i = 0; i < rand.length; i += 4) {
         rand[i + 0] =
@@ -152,9 +154,9 @@ export function initializeSnowState(gl, canvas, state) {
     gl.bindTexture(gl.TEXTURE_2D, state);
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, canvas.width, canvas.height + 1, gl.RGBA, gl.UNSIGNED_BYTE, rand);
 }
-export function prepareEnvironment(canvas, gl, backgroundTexture, framebuffer) {
+export function prepareEnvironment(backgroundTexture, framebuffer) {
     return __awaiter(this, void 0, void 0, function* () {
-        const shaderPreprocessEnvironmentProgram = initShaderProgram(gl, shaders.vsSource, shaders.fsPreprocessEnvironmentSource);
+        const shaderPreprocessEnvironmentProgram = initShaderProgram(shaders.vsSource, shaders.fsPreprocessEnvironmentSource);
         const programProcessEnvironmentInfo = {
             program: shaderPreprocessEnvironmentProgram,
             attribLocations: {
@@ -167,7 +169,7 @@ export function prepareEnvironment(canvas, gl, backgroundTexture, framebuffer) {
         };
         let aquarium_image = yield getImageData("aquarium.png");
         gl.activeTexture(gl.TEXTURE0 + 1);
-        const aquariumTexture = textureFromImage(gl, aquarium_image);
+        const aquariumTexture = textureFromImage(aquarium_image);
         // Render to texture
         gl.useProgram(programProcessEnvironmentInfo.program);
         // Set the shader uniforms

@@ -105,10 +105,11 @@ function handleInteractions(canvas, runtimeState) {
     }
     canvas.style.width = window.innerWidth + "px";
     canvas.style.height = window.innerHeight + "px";
+    glutils.initOpenGL(canvas);
     const gl = canvas.getContext('webgl', { alpha: false, antialias: false });
     gl.disable(gl.DEPTH_TEST);
-    const shaderProgram = glutils.initShaderProgram(gl, shaders.vsSource, shaders.fsScreen);
-    const shaderCopyProgram = glutils.initShaderProgram(gl, shaders.vsSource, shaders.fsScreen);
+    const shaderProgram = glutils.initShaderProgram(shaders.vsSource, shaders.fsScreen);
+    const shaderCopyProgram = glutils.initShaderProgram(shaders.vsSource, shaders.fsScreen);
     // Collect all the info needed to use the shader program.
     // Look up which attribute our shader program is using
     // for aVertexPosition and look up uniform locations.
@@ -137,23 +138,23 @@ function handleInteractions(canvas, runtimeState) {
     const framebuffer = gl.createFramebuffer();
     const textureWidth = glutils.nearestPowerOf2(canvas.width);
     const textureHeight = glutils.nearestPowerOf2(canvas.height);
-    glutils.prepareVertices(gl, programInfo.attribLocations.quad);
+    glutils.prepareVertices(programInfo.attribLocations.quad);
     // Double buffering texture, one for the previous state, one for the next state
     // RGB contains the 3 layers snow
     const state = [
-        glutils.texture(gl, textureWidth, textureHeight),
-        glutils.texture(gl, textureWidth, textureHeight)
+        glutils.texture(textureWidth, textureHeight),
+        glutils.texture(textureWidth, textureHeight)
     ];
     let currentTextureIndex = 0;
     // Initialize snow, each white dot is a snow drawn by the fragment shader
-    glutils.initializeSnowState(gl, canvas, state[currentTextureIndex]);
+    glutils.initializeSnowState(state[currentTextureIndex]);
     // Draw a pre-rendered background to a texture of the same canvas size
-    const backgroundTexture = glutils.texture(gl, canvas.width, canvas.height);
+    const backgroundTexture = glutils.texture(canvas.width, canvas.height);
     // Prepare viewport for render to backgroundTexture texture
-    glutils.prepareViewport(gl, canvas.width, canvas.height);
-    yield glutils.prepareEnvironment(canvas, gl, backgroundTexture, framebuffer);
+    glutils.prepareViewport(canvas.width, canvas.height);
+    yield glutils.prepareEnvironment(backgroundTexture, framebuffer);
     // Clear the canvas before we start drawing on it.
-    glutils.prepareViewport(gl, canvas.width, canvas.height);
+    glutils.prepareViewport(canvas.width, canvas.height);
     // Select active texture index
     gl.activeTexture(gl.TEXTURE0);
     // Bind texture to active texture slot 0

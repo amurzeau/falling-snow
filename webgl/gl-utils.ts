@@ -4,6 +4,14 @@ import * as vec2 from './gl-matrix/vec2.js'
 import * as shaders from './shaders.js'
 
 let gl: WebGLRenderingContext;
+let canvas: HTMLCanvasElement;
+
+
+export function initOpenGL(input_canvas: HTMLCanvasElement) {
+    gl = input_canvas.getContext('webgl', { alpha: false, antialias: false }) as WebGLRenderingContext;
+    canvas = input_canvas;
+}
+
 
 class GL2DObject {
     public position: vec2;
@@ -11,18 +19,13 @@ class GL2DObject {
     public texture: WebGLTexture;
 };
 
-
 export async function createGL2DObject(image: string) {
     let image_html: HTMLImageElement = await getImageData(image);
 
     let obj = new GL2DObject();
     obj.position = vec2.create();
     obj.size = vec2.create();
-    obj.texture = textureFromImage(gl, image_html);
-}
-
-export function initOpenGL(canvas: HTMLCanvasElement) {
-    gl = canvas.getContext('webgl', { alpha: false, antialias: false }) as WebGLRenderingContext;
+    obj.texture = textureFromImage(image_html);
 }
 
 
@@ -49,7 +52,7 @@ export async function getImageData(image: string): Promise<HTMLImageElement> {
 // creates a shader of the given type, uploads the source and
 // compiles it.
 //
-export function loadShader(gl: WebGLRenderingContext, type: any, source: any) {
+export function loadShader(type: any, source: any) {
     const shader = gl.createShader(type) as WebGLShader;
 
     // Send the source to the shader object
@@ -71,9 +74,9 @@ export function loadShader(gl: WebGLRenderingContext, type: any, source: any) {
     return shader;
 }
 
-export function initShaderProgram(gl: WebGLRenderingContext, vsSource: string, fsSource: string) {
-    const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vsSource) as WebGLShader;
-    const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fsSource) as WebGLShader;
+export function initShaderProgram(vsSource: string, fsSource: string) {
+    const vertexShader = loadShader(gl.VERTEX_SHADER, vsSource) as WebGLShader;
+    const fragmentShader = loadShader(gl.FRAGMENT_SHADER, fsSource) as WebGLShader;
 
     // Create the shader program
 
@@ -92,7 +95,7 @@ export function initShaderProgram(gl: WebGLRenderingContext, vsSource: string, f
     return shaderProgram;
 }
 
-export function initPositionBuffer(gl: WebGLRenderingContext) {
+export function initPositionBuffer() {
     // Create a buffer for the square's positions.
     const positionBuffer = gl.createBuffer();
 
@@ -119,7 +122,7 @@ export function nearestPowerOf2(n) {
     return 1 << 32 - Math.clz32(n);
 }
 
-export function texture(gl: WebGLRenderingContext, width, height) {
+export function texture(width, height) {
     var tex = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -134,7 +137,7 @@ export function texture(gl: WebGLRenderingContext, width, height) {
     return tex;
 };
 
-export function textureFromImage(gl: WebGLRenderingContext, image: HTMLImageElement) {
+export function textureFromImage(image: HTMLImageElement) {
     var tex = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
@@ -148,8 +151,8 @@ export function textureFromImage(gl: WebGLRenderingContext, image: HTMLImageElem
     return tex;
 };
 
-export function prepareVertices(gl: WebGLRenderingContext, quad_uniform: number) {
-    const positionBuffer = initPositionBuffer(gl);
+export function prepareVertices(quad_uniform: number) {
+    const positionBuffer = initPositionBuffer();
 
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer)
     gl.enableVertexAttribArray(quad_uniform);
@@ -163,7 +166,7 @@ export function prepareVertices(gl: WebGLRenderingContext, quad_uniform: number)
     );
 }
 
-export function prepareViewport(gl: WebGLRenderingContext, width, height) {
+export function prepareViewport(width, height) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.clearColor(0.0, 0.0, 0.0, 1.0); // Clear to black, fully opaque
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -171,7 +174,7 @@ export function prepareViewport(gl: WebGLRenderingContext, width, height) {
 }
 
 let snow_count = 0;
-export function initializeSnowState(gl: WebGLRenderingContext, canvas: HTMLCanvasElement, state: WebGLTexture) {
+export function initializeSnowState(state: WebGLTexture) {
     let rand = new Uint8Array(canvas.width * (canvas.height+1) * 4);
     for(let i = 0; i < rand.length; i += 4) {
         rand[i + 0] =
@@ -191,8 +194,8 @@ export function initializeSnowState(gl: WebGLRenderingContext, canvas: HTMLCanva
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, canvas.width, canvas.height+1, gl.RGBA, gl.UNSIGNED_BYTE, rand);
 }
 
-export async function prepareEnvironment(canvas: HTMLCanvasElement, gl: WebGLRenderingContext, backgroundTexture: WebGLTexture | null, framebuffer: WebGLFramebuffer | null) {
-    const shaderPreprocessEnvironmentProgram = initShaderProgram(gl, shaders.vsSource, shaders.fsPreprocessEnvironmentSource) as WebGLProgram;
+export async function prepareEnvironment(backgroundTexture: WebGLTexture | null, framebuffer: WebGLFramebuffer | null) {
+    const shaderPreprocessEnvironmentProgram = initShaderProgram(shaders.vsSource, shaders.fsPreprocessEnvironmentSource) as WebGLProgram;
     const programProcessEnvironmentInfo = {
         program: shaderPreprocessEnvironmentProgram,
         attribLocations: {
@@ -207,7 +210,7 @@ export async function prepareEnvironment(canvas: HTMLCanvasElement, gl: WebGLRen
     let aquarium_image: HTMLImageElement = await getImageData("aquarium.png");
 
     gl.activeTexture(gl.TEXTURE0 + 1);
-    const aquariumTexture = textureFromImage(gl, aquarium_image);
+    const aquariumTexture = textureFromImage(aquarium_image);
 
     // Render to texture
     gl.useProgram(programProcessEnvironmentInfo.program);
