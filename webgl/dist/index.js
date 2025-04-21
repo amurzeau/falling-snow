@@ -18,6 +18,23 @@ function monitorFPS(canvas, runtimeState) {
         fpsElement.textContent = "FPS: " + count + " " + window.devicePixelRatio + " " + canvas.width + " " + canvas.height + " " + runtimeState.bullesObjects.positions.length;
     }, 1000);
 }
+function preventSleep() {
+    return __awaiter(this, void 0, void 0, function* () {
+        let wakeLock = null;
+        // Function that attempts to request a screen wake lock.
+        const requestWakeLock = () => __awaiter(this, void 0, void 0, function* () {
+            try {
+                wakeLock = yield navigator.wakeLock.request();
+                console.log('Screen Wake Lock released:', wakeLock.released);
+            }
+            catch (err) {
+                console.error(`Wakelock failed: ${err.name}, ${err.message}`);
+            }
+        });
+        // Request a screen wake lock…
+        yield requestWakeLock();
+    });
+}
 function handleGravity(runtimeState) {
     if (!('GravitySensor' in window)) {
         console.log("No gravity sensor");
@@ -186,6 +203,7 @@ function handleInteractions(canvas, runtimeState) {
     monitorFPS(canvas, runtimeState);
     handleInteractions(canvas, runtimeState);
     handleGravity(runtimeState);
+    preventSleep();
     let bulleLocations = [
         // Purple
         [0.170, 0.210, 0.02],

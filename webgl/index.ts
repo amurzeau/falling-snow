@@ -12,6 +12,23 @@ function monitorFPS(canvas: HTMLCanvasElement, runtimeState) {
     }, 1000);
 }
 
+async function preventSleep() {
+    let wakeLock = null;
+
+    // Function that attempts to request a screen wake lock.
+    const requestWakeLock = async () => {
+        try {
+            wakeLock = await navigator.wakeLock.request();
+            console.log('Screen Wake Lock released:', wakeLock.released);
+        } catch (err) {
+            console.error(`Wakelock failed: ${err.name}, ${err.message}`);
+        }
+    };
+
+    // Request a screen wake lock…
+    await requestWakeLock();
+}
+
 
 function handleGravity(runtimeState) {
     if (! ('GravitySensor' in window)) {
@@ -222,6 +239,7 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
 
     handleInteractions(canvas, runtimeState);
     handleGravity(runtimeState);
+    preventSleep();
 
     let bulleLocations: vec3[] = [
         // Purple
