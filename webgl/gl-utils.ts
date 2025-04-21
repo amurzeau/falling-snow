@@ -10,6 +10,12 @@ let canvas: HTMLCanvasElement;
 export function initOpenGL(input_canvas: HTMLCanvasElement) {
     gl = input_canvas.getContext('webgl', { alpha: false, antialias: false }) as WebGLRenderingContext;
     canvas = input_canvas;
+
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.enable(gl.BLEND);
+    gl.disable(gl.DEPTH_TEST);
+
+    return gl;
 }
 
 
@@ -18,19 +24,20 @@ export class GL2DObject {
     public size: vec2;
     public texture: WebGLTexture;
 
-    async createGL2DObject(image: string) {
+    static async createGL2DObject(image: string, x: number, y: number, width: number, height: number) {
         let image_html: HTMLImageElement = await getImageData(image);
     
         let obj = new GL2DObject();
-        obj.position = vec2.create();
-        obj.size = vec2.create();
-        vec2.copy(obj.size, [1,1]);
+        obj.position = [x, y];
+        obj.size = [width, height];
         obj.texture = textureFromImage(image_html);
+
+        return obj;
     }
 
     bindObject(positionUniform: WebGLUniformLocation) {
         gl.bindTexture(gl.TEXTURE_2D, this.texture);
-        gl.uniform4f(positionUniform, this.position[0], this.position[1], this.size[0], this.size[1]);
+        gl.uniform4f(positionUniform, -this.position[0], -this.position[1], 1/this.size[0], 1/this.size[1]);
     }
 };
 
@@ -221,7 +228,7 @@ export async function prepareEnvironment(backgroundTexture: WebGLTexture | null,
     // Render to texture
     gl.useProgram(programProcessEnvironmentInfo.program);
     // Set the shader uniforms
-    gl.uniform4f(programProcessEnvironmentInfo.uniformLocations.position, 0, 1, 0, 1);
+    gl.uniform4f(programProcessEnvironmentInfo.uniformLocations.position, 0, 0, 1, 1);
     gl.uniform1iv(programProcessEnvironmentInfo.uniformLocations.backgroundTextures, [1]);
     gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, backgroundTexture, 0);

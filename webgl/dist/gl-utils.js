@@ -7,29 +7,31 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-/// <reference path='./gl-matrix/types.d.ts'/>
-import * as vec2 from './gl-matrix/vec2.js';
 import * as shaders from './shaders.js';
 let gl;
 let canvas;
 export function initOpenGL(input_canvas) {
     gl = input_canvas.getContext('webgl', { alpha: false, antialias: false });
     canvas = input_canvas;
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.enable(gl.BLEND);
+    gl.disable(gl.DEPTH_TEST);
+    return gl;
 }
 export class GL2DObject {
-    createGL2DObject(image) {
+    static createGL2DObject(image, x, y, width, height) {
         return __awaiter(this, void 0, void 0, function* () {
             let image_html = yield getImageData(image);
             let obj = new GL2DObject();
-            obj.position = vec2.create();
-            obj.size = vec2.create();
-            vec2.copy(obj.size, [1, 1]);
+            obj.position = [x, y];
+            obj.size = [width, height];
             obj.texture = textureFromImage(image_html);
+            return obj;
         });
     }
     bindObject(positionUniform) {
         gl.bindTexture(gl.TEXTURE_2D, this.texture);
-        gl.uniform4f(positionUniform, this.position[0], this.position[1], this.size[0], this.size[1]);
+        gl.uniform4f(positionUniform, -this.position[0], -this.position[1], 1 / this.size[0], 1 / this.size[1]);
     }
 }
 ;
@@ -178,7 +180,7 @@ export function prepareEnvironment(backgroundTexture, framebuffer) {
         // Render to texture
         gl.useProgram(programProcessEnvironmentInfo.program);
         // Set the shader uniforms
-        gl.uniform4f(programProcessEnvironmentInfo.uniformLocations.position, 0, 1, 0, 1);
+        gl.uniform4f(programProcessEnvironmentInfo.uniformLocations.position, 0, 0, 1, 1);
         gl.uniform1iv(programProcessEnvironmentInfo.uniformLocations.backgroundTextures, [1]);
         gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
         gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, backgroundTexture, 0);

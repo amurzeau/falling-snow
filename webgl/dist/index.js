@@ -105,9 +105,7 @@ function handleInteractions(canvas, runtimeState) {
     }
     canvas.style.width = window.innerWidth + "px";
     canvas.style.height = window.innerHeight + "px";
-    glutils.initOpenGL(canvas);
-    const gl = canvas.getContext('webgl', { alpha: false, antialias: false });
-    gl.disable(gl.DEPTH_TEST);
+    let gl = glutils.initOpenGL(canvas);
     const shaderProgram = glutils.initShaderProgram(shaders.vsSource, shaders.fsScreen);
     // Collect all the info needed to use the shader program.
     // Look up which attribute our shader program is using
@@ -141,9 +139,13 @@ function handleInteractions(canvas, runtimeState) {
     glutils.prepareViewport(canvas.width, canvas.height);
     yield glutils.prepareEnvironment(backgroundTexture, framebuffer);
     let backgroundObject = new glutils.GL2DObject();
-    backgroundObject.position = [0.0, 1.0];
-    backgroundObject.size = [0.0, 1.0];
+    backgroundObject.position = [0.0, 0.0];
+    backgroundObject.size = [1.0, 1.0];
     backgroundObject.texture = backgroundTexture;
+    let objects = [];
+    objects.push(backgroundObject);
+    let poissonObject = yield glutils.GL2DObject.createGL2DObject("poisson.png", 0.02, 0.5, 0.05, 0.05);
+    objects.push(poissonObject);
     // Clear the canvas before we start drawing on it.
     glutils.prepareViewport(canvas.width, canvas.height);
     // Select active texture index
@@ -176,10 +178,11 @@ function handleInteractions(canvas, runtimeState) {
                 //}
                 //currentTextureIndex = currentTextureIndex == 1 ? 0 : 1;
                 // Render objects
-                gl.useProgram(programInfo.program);
-                gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-                backgroundObject.bindObject(programInfo.uniformLocations.position);
-                gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+                for (let object of objects) {
+                    object.bindObject(programInfo.uniformLocations.position);
+                    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+                }
+                poissonObject.position[0] += 0.01;
             }
         }
         window.requestAnimationFrame(updateAnimation);

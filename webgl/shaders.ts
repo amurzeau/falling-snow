@@ -9,26 +9,18 @@ export const vsSource = `#version 100
     attribute vec2 in_quad;
     uniform vec4 position;
     varying vec2 vTexCoord;
-
-    mat4 ortho(float left, float right, float bottom, float top) {
-        // Ortho matrix
-        float near = -1.0;
-        float far = 1.0;
-        float rl = right - left;
-        float tb = top - bottom;
-        float fn = far - near;
-
-        return mat4( 2.0/rl,    0.0,   0.0,  0.0,
-                      0.0,   2.0/tb,   0.0,  0.0,
-                      0.0,    0.0, -2.0/fn,  0.0,
-                      -(right + left)/rl,    -(top + bottom)/tb,   -(far + near)/fn,  1.0);
-        
-    }
+    
+    // Orthographic projection with left right bottom top = 0, 1, 0, 1
+    const mat4 projection = mat4(
+        2.0,    0.0,   0.0,  0.0,
+        0.0,    2.0,   0.0,  0.0,
+        0.0,    0.0,  -1.0,  0.0,
+        -1.0,  -1.0,   0.0,  1.0);
 
     void main() {
-        mat4 projection = ortho(position.x, position.y, position.z, position.w);
-        gl_Position = projection * vec4(in_quad.xy, 0.0, 1.0);
-        vTexCoord = in_quad.xy;
+        vec2 vertice = (in_quad / position.zw - position.xy);
+        gl_Position = projection * vec4(vertice, 0.0, 1.0);
+        vTexCoord = in_quad;
     }
   `;
 
