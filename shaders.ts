@@ -9,7 +9,7 @@ export const vsSource = `#version 300 es
     in vec2 in_quad;
 
     void main() {
-      gl_Position = vec4(in_quad, 0.0, 1.0);
+        gl_Position = vec4(in_quad, 0.0, 1.0);
     }
   `;
 
