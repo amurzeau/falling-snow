@@ -112,7 +112,6 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
 
     let gl = glutils.initOpenGL(canvas);
 
-    gl.disable(gl.DEPTH_TEST);
     const shaderProgram = glutils.initShaderProgram(shaders.vsSource, shaders.fsSource) as WebGLProgram;
     const shaderCopyProgram = glutils.initShaderProgram(shaders.vsSource, shaders.fsCopySource) as WebGLProgram;
     // Collect all the info needed to use the shader program.
@@ -125,7 +124,7 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
             quad: gl.getAttribLocation(shaderProgram, "in_quad"),
         },
         uniformLocations: {
-            //position: gl.getUniformLocation(shaderProgram, "position"),
+            position: gl.getUniformLocation(shaderProgram, "position"),
             scale: gl.getUniformLocation(shaderProgram, "scale"),
             state: gl.getUniformLocation(shaderProgram, "state"),
             random: gl.getUniformLocation(shaderProgram, "random"),
@@ -139,7 +138,7 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
             quad: gl.getAttribLocation(shaderCopyProgram, "in_quad"),
         },
         uniformLocations: {
-            //position: gl.getUniformLocation(shaderCopyProgram, "position"),
+            position: gl.getUniformLocation(shaderCopyProgram, "position"),
             scale: gl.getUniformLocation(shaderCopyProgram, "scale"),
             state: gl.getUniformLocation(shaderCopyProgram, "state"),
             time: gl.getUniformLocation(shaderCopyProgram, "time"),
@@ -185,7 +184,7 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
 
     gl.useProgram(programInfo.program);
     // Set the shader uniforms
-    //gl.uniform4f(programInfo.uniformLocations.position, 0, 0, 1, 1);
+    gl.uniform4f(programInfo.uniformLocations.position, 0, 0, 1, 1);
     gl.uniform4f(
         programInfo.uniformLocations.scale,
         textureWidth,
@@ -203,7 +202,7 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
 
     gl.useProgram(programCopyInfo.program);
     // Set the shader uniforms
-    //gl.uniform4f(programCopyInfo.uniformLocations.position, 0, 0, 1, 1);
+    gl.uniform4f(programCopyInfo.uniformLocations.position, 0, 0, 1, 1);
     gl.uniform4f(
         programCopyInfo.uniformLocations.scale,
         textureWidth,

@@ -116,7 +116,7 @@ export function initPositionBuffer() {
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
 
     // Now create an array of positions for the square.
-    const positions = [-1, -1, 1, -1, -1, 1, 1, 1];
+    const positions = [0, 0, 1, 0, 0, 1, 1, 1];
 
     // Now pass the list of positions into WebGL to build the
     // shape. We do this by creating a Float32Array from the
@@ -212,7 +212,7 @@ export async function prepareEnvironment(backgroundTexture: WebGLTexture | null,
             quad: gl.getAttribLocation(shaderPreprocessEnvironmentProgram, "in_quad"),
         },
         uniformLocations: {
-            //position: gl.getUniformLocation(shaderPreprocessEnvironmentProgram, "position"),
+            position: gl.getUniformLocation(shaderPreprocessEnvironmentProgram, "position"),
             backgroundTextures: gl.getUniformLocation(shaderPreprocessEnvironmentProgram, "backgroundTextures"),
         },
     };
@@ -228,7 +228,7 @@ export async function prepareEnvironment(backgroundTexture: WebGLTexture | null,
     // Render to texture
     gl.useProgram(programProcessEnvironmentInfo.program);
     // Set the shader uniforms
-    //gl.uniform4f(programProcessEnvironmentInfo.uniformLocations.position, 0, 0, 1, 1);
+    gl.uniform4f(programProcessEnvironmentInfo.uniformLocations.position, 0, 0, 1, 1);
     gl.uniform1iv(programProcessEnvironmentInfo.uniformLocations.backgroundTextures, [1, 2]);
     gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, backgroundTexture, 0);
