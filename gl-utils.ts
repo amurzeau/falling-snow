@@ -11,8 +11,8 @@ export function initOpenGL(input_canvas: HTMLCanvasElement) {
     gl = input_canvas.getContext('webgl2', { alpha: false, antialias: false }) as WebGL2RenderingContext;
     canvas = input_canvas;
 
-    //gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    //gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.enable(gl.BLEND);
     gl.disable(gl.DEPTH_TEST);
 
     return gl;

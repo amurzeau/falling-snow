@@ -258,6 +258,8 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
                 gl.uniform1f(programInfo.uniformLocations.time, (now % 1000) / 1000.0);
                 gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
                 gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, state[currentTextureIndex], 0);
+
+                gl.disable(gl.BLEND);
                 gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
                 // Render to screen
@@ -265,6 +267,7 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
                 gl.uniform1f(programCopyInfo.uniformLocations.time, (now % 2000) * (1.0 / 2000.0));
                 gl.uniform2f(programCopyInfo.uniformLocations.traineauPosition, runtimeState.traineauPosition, canvas.height - 100.0);
                 gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+                gl.enable(gl.BLEND);
                 gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
                 runtimeState.traineauPosition -= 1;
