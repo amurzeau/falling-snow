@@ -1,0 +1,14 @@
+{
+    "name": "Aquarium",
+    "short_name": "Aquarium",
+    "icons": [
+        {
+            "src": "/favicon.png",
+            "type": "image/png",
+            "sizes": "144x144"
+        }
+    ],
+    "start_url": "/",
+    "display":      "fullscreen",
+    "orientation":  "landscape-primary"
+}
