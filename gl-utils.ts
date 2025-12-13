@@ -219,17 +219,20 @@ export async function prepareEnvironment(backgroundTexture: WebGLTexture | null,
 
     let maison_image: HTMLImageElement = await getImageData("maison.png");
     let sapin_image: HTMLImageElement = await getImageData("sapin.png");
+    let bigben_image: HTMLImageElement = await getImageData("bigben.png");
 
     gl.activeTexture(gl.TEXTURE0 + 1);
     const maisonTexture = textureFromImage(maison_image);
     gl.activeTexture(gl.TEXTURE0 + 2);
     const sapinTexture = textureFromImage(sapin_image);
+    gl.activeTexture(gl.TEXTURE0 + 3);
+    const bigbenTexture = textureFromImage(bigben_image);
 
     // Render to texture
     gl.useProgram(programProcessEnvironmentInfo.program);
     // Set the shader uniforms
     gl.uniform4f(programProcessEnvironmentInfo.uniformLocations.position, 0, 0, 1, 1);
-    gl.uniform1iv(programProcessEnvironmentInfo.uniformLocations.backgroundTextures, [1, 2]);
+    gl.uniform1iv(programProcessEnvironmentInfo.uniformLocations.backgroundTextures, [1, 2, 3]);
     gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, backgroundTexture, 0);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
@@ -237,5 +240,6 @@ export async function prepareEnvironment(backgroundTexture: WebGLTexture | null,
 
     gl.deleteTexture(maisonTexture);
     gl.deleteTexture(sapinTexture);
+    gl.deleteTexture(bigbenTexture);
     gl.deleteProgram(programProcessEnvironmentInfo.program);
 }

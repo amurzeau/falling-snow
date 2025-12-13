@@ -32,7 +32,7 @@ precision highp float;
 #endif
 
 out vec4 fragColor;
-uniform sampler2D backgroundTextures[2];
+uniform sampler2D backgroundTextures[3];
 
 vec4 get_background(sampler2D sampler, vec2 offset, float scale) {
     return texelFetch(sampler, ivec2((gl_FragCoord.xy + offset) / scale), 0);
@@ -42,10 +42,12 @@ void main() {
     vec4 texture1 = get_background(backgroundTextures[0], vec2(-10.0, 0.0), 1.0);
     vec4 texture2 = get_background(backgroundTextures[1], vec2(-120.0, 0.0), 1.0);
     vec4 texture3 = get_background(backgroundTextures[1], vec2(-256.0, 0.0), 2.0);
+    vec4 texture4 = get_background(backgroundTextures[2], vec2(-600.0, 0.0), 2.0);
 
     vec4 blend = texture1.rgba;
     blend = mix(blend, texture2.rgba, texture2.a);
     blend = mix(blend, texture3.rgba, texture3.a);
+    blend = mix(blend, texture4.rgba, texture4.a);
 
     fragColor = blend;
 }
@@ -411,5 +413,27 @@ void main() {
     fragColor = blend_color();
     // fragColor = texture(state, (gl_FragCoord.xy) / scale.xy);
     // fragColor.a = 1.0;
+}
+  `;
+
+
+
+export const fsLights = `#version 300 es
+#ifdef GL_ES
+precision mediump float;
+#endif
+
+in vec2 vTexCoord;
+out vec4 fragColor;
+uniform vec4 scale;
+uniform vec3 color;
+uniform float radius;
+uniform float power;
+
+
+void main() {
+    vec2 distance = vTexCoord.xy - vec2(0.5, 0.5);
+    float distance_pow2 = dot(distance, distance);
+    fragColor = vec4(color, radius / (1.0 + (distance_pow2 / power)));
 }
   `;
