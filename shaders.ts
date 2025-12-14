@@ -39,13 +39,11 @@ vec4 get_background(sampler2D sampler, vec2 offset, float scale) {
 }
 
 void main() {
-    vec4 texture1 = get_background(backgroundTextures[0], vec2(-10.0, 0.0), 1.0);
-    vec4 texture2 = get_background(backgroundTextures[1], vec2(-120.0, 0.0), 1.0);
+    vec4 texture1 = get_background(backgroundTextures[0], vec2(-10.0, 0.0), 2.0);
     vec4 texture3 = get_background(backgroundTextures[1], vec2(-256.0, 0.0), 2.0);
     vec4 texture4 = get_background(backgroundTextures[2], vec2(-600.0, 0.0), 1.5);
 
     vec4 blend = texture1.rgba;
-    blend = mix(blend, texture2.rgba, texture2.a);
     blend = mix(blend, texture3.rgba, texture3.a);
     blend = mix(blend, texture4.rgba, texture4.a);
 
@@ -240,13 +238,13 @@ void main() {
             : max(particule_age_origin - 0.0001, 0.0);
 
     float current_smoke_age = get_snow_bottom(vec2(0.0, 0.0)).a;
-    float ratio_height = clamp((gl_FragCoord.y - 70.0) / 40.0, 0.0, 1.0);
+    float ratio_height = clamp((gl_FragCoord.y - 70.0*2.0) / 40.0, 0.0, 1.0);
     vec2 smoke_origin = vec2(0.0, -1.0);
     smoke_origin = rotate(smoke_origin, (ratio_height*2.0 + 2.0*sin((0.1+ratio_height) * random.x * gl_FragCoord.y * gl_FragCoord.x)) * (-0.25 * 3.14159));
     smoke_origin = (1.0 + 5.0*ratio_height)*smoke_origin;
     float smoke_source = get_snow_bottom(smoke_origin).a * 1.01;
     float speed = (2.0 - ratio_height) * 0.1;
-    float smoke_age = insideBox(gl_FragCoord.xy, vec2(25.0, 69.0), vec2(35.0, 71.0)) > 0.0 ? 1.0 :
+    float smoke_age = insideBox(gl_FragCoord.xy, vec2(10.0+15.0*2.0, 69.0*2.0), vec2(10.0+25.0*2.0, 69.0*2.0 + 2.0)) > 0.0 ? 1.0 :
     (
         min(current_smoke_age * (1.0 - speed) + speed * smoke_source, 1.0)
     );
@@ -433,33 +431,24 @@ vec4 blend_color() {
     float light_power_1 = 1.0 * (step(0.5, fract(lightTime)));
     float light_power_2 = 1.0 * (1.0 - step(0.5, fract(lightTime)));
 
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 7.0 , 33.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_1, 15.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 11.0, 33.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_2, 15.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 16.0, 33.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_1, 15.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 20.0, 33.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_2, 15.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 25.0, 33.0), vec4(1.000, 0.000, 0.585, 1.0), light_power_1, 15.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 29.0, 33.0), vec4(1.000, 0.000, 0.440, 1.0), light_power_2, 15.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 33.0, 33.0), vec4(1.000, 0.533, 0.000, 1.0), light_power_1, 15.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 38.0, 33.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_2, 15.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 42.0, 33.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_1, 15.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 47.0, 33.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_2, 15.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 51.0, 33.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_1, 15.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 56.0, 33.0), vec4(1.000, 0.000, 0.585, 1.0), light_power_2, 15.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 60.0, 33.0), vec4(1.000, 0.000, 0.440, 1.0), light_power_1, 15.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 64.0, 33.0), vec4(1.000, 0.533, 0.000, 1.0), light_power_2, 15.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 69.0, 33.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_1, 15.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 73.0, 33.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_2, 15.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 78.0, 33.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_1, 15.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 82.0, 33.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_2, 15.0);
-
-    // Sapin 1
-    light_power_1 = 1.0 * (step(0.5, fract(lightTime + 0.7)));
-    light_power_2 = 1.0 * (1.0 - step(0.5, fract(lightTime + 0.7)));
-    texture_with_light += apply_light(background_texture, vec2(120.0 + 39.0, 19.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_1, 500.0);
-    texture_with_light += apply_light(background_texture, vec2(120.0 + 92.0, 15.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_2, 500.0);
-    texture_with_light += apply_light(background_texture, vec2(120.0 + 69.0, 35.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_2, 500.0);
-    texture_with_light += apply_light(background_texture, vec2(120.0 + 72.0, 75.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_1, 500.0);
-    texture_with_light += apply_light(background_texture, vec2(120.0 + 57.0, 83.0), vec4(1.000, 0.000, 0.585, 1.0), light_power_2, 500.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 7.0  * 2.0, 33.0*2.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_1, 30.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 11.0 * 2.0, 33.0*2.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_2, 30.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 16.0 * 2.0, 33.0*2.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_1, 30.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 20.0 * 2.0, 33.0*2.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_2, 30.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 25.0 * 2.0, 33.0*2.0), vec4(1.000, 0.000, 0.585, 1.0), light_power_1, 30.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 29.0 * 2.0, 33.0*2.0), vec4(1.000, 0.000, 0.440, 1.0), light_power_2, 30.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 33.0 * 2.0, 33.0*2.0), vec4(1.000, 0.533, 0.000, 1.0), light_power_1, 30.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 38.0 * 2.0, 33.0*2.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_2, 30.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 42.0 * 2.0, 33.0*2.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_1, 30.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 47.0 * 2.0, 33.0*2.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_2, 30.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 51.0 * 2.0, 33.0*2.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_1, 30.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 56.0 * 2.0, 33.0*2.0), vec4(1.000, 0.000, 0.585, 1.0), light_power_2, 30.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 60.0 * 2.0, 33.0*2.0), vec4(1.000, 0.000, 0.440, 1.0), light_power_1, 30.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 64.0 * 2.0, 33.0*2.0), vec4(1.000, 0.533, 0.000, 1.0), light_power_2, 30.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 69.0 * 2.0, 33.0*2.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_1, 30.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 73.0 * 2.0, 33.0*2.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_2, 30.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 78.0 * 2.0, 33.0*2.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_1, 30.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 82.0 * 2.0, 33.0*2.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_2, 30.0);
 
     // Sapin 2
     light_power_1 = 1.0 * (step(0.5, fract(lightTime + 0.4)));
