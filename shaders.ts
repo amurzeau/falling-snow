@@ -374,7 +374,6 @@ vec2 eiffelLight(float time) {
     float beam_distance = beam_source_distance.x / sin(angle);
 
     float light_distance = abs(beam_distance + z_distance);
-    float distance_pow2 = dot(light_distance, light_distance);
 
     // For Y
     // Beam is a cone
@@ -383,7 +382,7 @@ vec2 eiffelLight(float time) {
     beam_height += step(0.0, beam_height)*2.0;
 
     float ratio_y = clamp(beam_height - abs(beam_source_distance.y), 0.0, 0.5);
-    return vec2(ratio_y * 10000.0 / distance_pow2, angle);
+    return vec2(ratio_y / light_distance * 10000.0 / light_distance, angle);
 }
 
 vec4 blend_color() {
