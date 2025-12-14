@@ -51,7 +51,7 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
 
 
     function handleTouchEvent(event) {
-        if(runtimeState.x != -1 || runtimeState.y != -1) {
+        if(runtimeState.x >= 0 && runtimeState.y >= 0) {
             return;
         }
 
@@ -61,8 +61,12 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
         const touchEvent = event.touches[0];
 
         const rect = canvas.getBoundingClientRect();
-        const localX = touchEvent.clientX - rect.left;
-        const localY = window.innerHeight - (touchEvent.clientY - rect.top);
+        let localX = touchEvent.clientX - rect.left;
+        let localY = window.innerHeight - (touchEvent.clientY - rect.top);
+        if(localX >= window.innerWidth)
+            localX = window.innerWidth - 1;
+        if(localY >= window.innerHeight)
+            localY = window.innerHeight - 1;
         runtimeState.x = localX;
         runtimeState.y = localY;
 
@@ -267,7 +271,7 @@ window.onload = function() {
                 {
                     gl.activeTexture(gl.TEXTURE0);
                     gl.bindTexture(gl.TEXTURE_2D, state[currentTextureIndex]);
-                    if(runtimeState.x != -1 && runtimeState.y != -1) {
+                    if(runtimeState.x >= 0 && runtimeState.y >= 0) {
                         runtimeState.x = runtimeState.x / window.innerWidth * canvas.width;
                         runtimeState.y = runtimeState.y / window.innerHeight * canvas.height;
                         gl.texSubImage2D(gl.TEXTURE_2D, 0, runtimeState.x, runtimeState.y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 128, 0, 0]));
