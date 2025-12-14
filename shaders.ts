@@ -78,6 +78,10 @@ float DecodeFloatRGB (vec2 v) {
     return dot(v, bitDec);
 }
 
+int float2int(float v) {
+    return int(round(v * 255.0));
+}
+
 int get_wrapped_falling_snow(vec2 offset) {
     float new_flake = step(scale.w, gl_FragCoord.y + offset.y);
 
@@ -87,7 +91,7 @@ int get_wrapped_falling_snow(vec2 offset) {
     vec2 wrapped_coord = mod((gl_FragCoord.xy + offset), scale.zw);
 
     // Snow flake position is encoded in first component only
-    int value = int(texture(state, wrapped_coord / scale.xy).x * 255.0);
+    int value = float2int(texture(state, wrapped_coord / scale.xy).x);
     if(new_flake > 0.0) {
         value |= 0x04;
     }
@@ -142,8 +146,8 @@ vec2 encode_snow_particules(float snow_particule_age) {
 
 bool get_snow_flake_dropped() {
     int snow_present =
-        int(get_snow_bottom(vec2(0.0, 1.0)).r * 255.0) |
-        int(get_snow_bottom(vec2(0.0, 0.0)).r * 255.0);
+        float2int(get_snow_bottom(vec2(0.0, 1.0)).r) |
+        float2int(get_snow_bottom(vec2(0.0, 0.0)).r);
 
     return (snow_present & 0x2) != 0 && (snow_present & 0x4) != 0;
 }
@@ -293,7 +297,7 @@ float DecodeFloatRGB (vec2 v) {
 
 vec4 get(vec2 offset) {
     vec4 texel = texture(state, (gl_FragCoord.xy + offset) / scale.xy);
-    int snow_flakes = int(texel.r * 255.0);
+    int snow_flakes = int(round(texel.r * 255.0));
     float particule_age = DecodeFloatRGB(texel.gb);
 
     texel.r = (snow_flakes & 0x01) != 0 ? 1.0 : 0.0;
