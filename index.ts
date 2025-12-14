@@ -93,189 +93,193 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
     });
 }
 
-(async () => {
-    const canvas = document.getElementById('canvas') as HTMLCanvasElement;
-    if (!canvas)
-        return;
+window.onload = function() {
+    setTimeout(
+    async () => {
+        const canvas = document.getElementById('canvas') as HTMLCanvasElement;
+        if (!canvas)
+            return;
 
-    // Adjust canvas size to an appropriate zoom to avoid too much pixel to be drawn by fragment shader
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+        // Adjust canvas size to an appropriate zoom to avoid too much pixel to be drawn by fragment shader
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
 
-    while(canvas.width > 512 && canvas.height > 512) {
-        canvas.width /= 2.0;
-        canvas.height /= 2.0;
-    }
-
-    canvas.style.width = window.innerWidth + "px";
-    canvas.style.height = window.innerHeight + "px";
-
-    let gl = glutils.initOpenGL(canvas);
-
-    const shaderProgram = glutils.initShaderProgram(shaders.vsSource, shaders.fsSource) as WebGLProgram;
-    const shaderCopyProgram = glutils.initShaderProgram(shaders.vsSource, shaders.fsCopySource) as WebGLProgram;
-    // Collect all the info needed to use the shader program.
-    // Look up which attribute our shader program is using
-    // for aVertexPosition and look up uniform locations.
-
-    const programInfo = {
-        program: shaderProgram,
-        attribLocations: {
-            quad: gl.getAttribLocation(shaderProgram, "in_quad"),
-        },
-        uniformLocations: {
-            position: gl.getUniformLocation(shaderProgram, "position"),
-            scale: gl.getUniformLocation(shaderProgram, "scale"),
-            state: gl.getUniformLocation(shaderProgram, "state"),
-            random: gl.getUniformLocation(shaderProgram, "random"),
-            time: gl.getUniformLocation(shaderProgram, "time"),
-            backgroundTexture: gl.getUniformLocation(shaderProgram, "backgroundTexture"),
-        },
-    };
-    const programCopyInfo = {
-        program: shaderCopyProgram,
-        attribLocations: {
-            quad: gl.getAttribLocation(shaderCopyProgram, "in_quad"),
-        },
-        uniformLocations: {
-            position: gl.getUniformLocation(shaderCopyProgram, "position"),
-            scale: gl.getUniformLocation(shaderCopyProgram, "scale"),
-            state: gl.getUniformLocation(shaderCopyProgram, "state"),
-            time: gl.getUniformLocation(shaderCopyProgram, "time"),
-            backgroundTexture: gl.getUniformLocation(shaderCopyProgram, "backgroundTexture"),
-            traineauTexture: gl.getUniformLocation(shaderCopyProgram, "traineauTexture"),
-            traineauPosition: gl.getUniformLocation(shaderCopyProgram, "traineauPosition"),
-        },
-    };
-
-    const framebuffer = gl.createFramebuffer();
-
-    const textureWidth = glutils.nearestPowerOf2(canvas.width);
-    const textureHeight = glutils.nearestPowerOf2(canvas.height);
-
-    glutils.prepareVertices(programInfo.attribLocations.quad);
-    // Clear the canvas before we start drawing on it.
-    glutils.prepareViewport(canvas.width, canvas.height);
-
-    // Double buffering texture, one for the previous state, one for the next state
-    // RGB contains the 3 layers snow
-    const state = [
-        glutils.texture(textureWidth, textureHeight),
-        glutils.texture(textureWidth, textureHeight)
-    ];
-    let currentTextureIndex = 0;
-
-    // Initialize snow, each white dot is a snow drawn by the fragment shader
-    let snow_count = glutils.initializeSnowState(state[currentTextureIndex]);
-
-    const backgroundTexture = glutils.texture(textureWidth, textureHeight);
-    await glutils.prepareEnvironment(backgroundTexture, framebuffer);
-
-    // Prepare textures for drawing main loop
-    let traineau_image: HTMLImageElement = await glutils.getImageData("traineau.png");
-
-    gl.activeTexture(gl.TEXTURE0 + 1);
-    gl.bindTexture(gl.TEXTURE_2D, backgroundTexture);
-    gl.activeTexture(gl.TEXTURE0 + 2);
-    glutils.textureFromImage(traineau_image);
-
-    gl.activeTexture(gl.TEXTURE0);
-
-
-    gl.useProgram(programInfo.program);
-    // Set the shader uniforms
-    gl.uniform4f(programInfo.uniformLocations.position, 0, 0, 1, 1);
-    gl.uniform4f(
-        programInfo.uniformLocations.scale,
-        textureWidth,
-        textureHeight,
-        canvas.width,
-        canvas.height,
-    );
-    gl.uniform1i(
-        programInfo.uniformLocations.state,
-        0,
-    );
-    gl.uniform1i(programInfo.uniformLocations.state, 0);
-    gl.uniform1i(programInfo.uniformLocations.backgroundTexture, 1);
-
-
-    gl.useProgram(programCopyInfo.program);
-    // Set the shader uniforms
-    gl.uniform4f(programCopyInfo.uniformLocations.position, 0, 0, 1, 1);
-    gl.uniform4f(
-        programCopyInfo.uniformLocations.scale,
-        textureWidth,
-        textureHeight,
-        canvas.width,
-        canvas.height,
-    );
-    gl.uniform1i(programCopyInfo.uniformLocations.state, 0);
-    gl.uniform1i(programCopyInfo.uniformLocations.backgroundTexture, 1);
-    gl.uniform1i(programCopyInfo.uniformLocations.traineauTexture, 2);
-
-
-    let runtimeState = {
-        frameCount: 0,
-        x: -1,
-        y: -1,
-        traineauPosition: canvas.width,
-    }
-    monitorFPS(canvas, runtimeState, snow_count);
-
-    handleInteractions(canvas, runtimeState);
-    
-
-    const fpsInterval = 1000 / 61.0;
-    let expectedFrameDate = Date.now();
-
-    function updateAnimation(timestamp: DOMHighResTimeStamp) {
-        let now = Date.now();
-        if (now >= expectedFrameDate) {
-            expectedFrameDate += Math.trunc((now - expectedFrameDate) / fpsInterval + 1) * fpsInterval;
-
-            runtimeState.frameCount++;
-            {
-                gl.activeTexture(gl.TEXTURE0);
-                gl.bindTexture(gl.TEXTURE_2D, state[currentTextureIndex]);
-                if(runtimeState.x != -1 && runtimeState.y != -1) {
-                    runtimeState.x = runtimeState.x / window.innerWidth * canvas.width;
-                    runtimeState.y = runtimeState.y / window.innerHeight * canvas.height;
-                    gl.texSubImage2D(gl.TEXTURE_2D, 0, runtimeState.x, runtimeState.y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 128, 0, 0]));
-                    runtimeState.x = runtimeState.y = -1;
-                }
-                currentTextureIndex = currentTextureIndex == 1 ? 0 : 1;
-
-                // Render to texture
-                gl.useProgram(programInfo.program);
-                // Set the shader uniforms
-                gl.uniform2f(
-                    programInfo.uniformLocations.random,
-                    Math.random(),
-                    Math.random(),
-                );
-                gl.uniform1f(programInfo.uniformLocations.time, (now % 1000) / 1000.0);
-                gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-                gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, state[currentTextureIndex], 0);
-
-                gl.disable(gl.BLEND);
-                gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-
-                // Render to screen
-                gl.useProgram(programCopyInfo.program);
-                gl.uniform1f(programCopyInfo.uniformLocations.time, (now % 2000) * (1.0 / 2000.0));
-                gl.uniform2f(programCopyInfo.uniformLocations.traineauPosition, runtimeState.traineauPosition, canvas.height - 100.0);
-                gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-                gl.enable(gl.BLEND);
-                gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-
-                runtimeState.traineauPosition -= 1;
-                if (runtimeState.traineauPosition < -traineau_image.width)
-                    runtimeState.traineauPosition = canvas.width * 2;
-            }
+        while(canvas.width > 512 && canvas.height > 512) {
+            canvas.width /= 2.0;
+            canvas.height /= 2.0;
         }
 
+        canvas.style.width = window.innerWidth + "px";
+        canvas.style.height = window.innerHeight + "px";
+
+        let gl = glutils.initOpenGL(canvas);
+
+        const shaderProgram = glutils.initShaderProgram(shaders.vsSource, shaders.fsSource) as WebGLProgram;
+        const shaderCopyProgram = glutils.initShaderProgram(shaders.vsSource, shaders.fsCopySource) as WebGLProgram;
+        // Collect all the info needed to use the shader program.
+        // Look up which attribute our shader program is using
+        // for aVertexPosition and look up uniform locations.
+
+        const programInfo = {
+            program: shaderProgram,
+            attribLocations: {
+                quad: gl.getAttribLocation(shaderProgram, "in_quad"),
+            },
+            uniformLocations: {
+                position: gl.getUniformLocation(shaderProgram, "position"),
+                scale: gl.getUniformLocation(shaderProgram, "scale"),
+                state: gl.getUniformLocation(shaderProgram, "state"),
+                random: gl.getUniformLocation(shaderProgram, "random"),
+                time: gl.getUniformLocation(shaderProgram, "time"),
+                backgroundTexture: gl.getUniformLocation(shaderProgram, "backgroundTexture"),
+            },
+        };
+        const programCopyInfo = {
+            program: shaderCopyProgram,
+            attribLocations: {
+                quad: gl.getAttribLocation(shaderCopyProgram, "in_quad"),
+            },
+            uniformLocations: {
+                position: gl.getUniformLocation(shaderCopyProgram, "position"),
+                scale: gl.getUniformLocation(shaderCopyProgram, "scale"),
+                state: gl.getUniformLocation(shaderCopyProgram, "state"),
+                time: gl.getUniformLocation(shaderCopyProgram, "time"),
+                backgroundTexture: gl.getUniformLocation(shaderCopyProgram, "backgroundTexture"),
+                traineauTexture: gl.getUniformLocation(shaderCopyProgram, "traineauTexture"),
+                traineauPosition: gl.getUniformLocation(shaderCopyProgram, "traineauPosition"),
+            },
+        };
+
+        const framebuffer = gl.createFramebuffer();
+
+        const textureWidth = glutils.nearestPowerOf2(canvas.width);
+        const textureHeight = glutils.nearestPowerOf2(canvas.height);
+
+        glutils.prepareVertices(programInfo.attribLocations.quad);
+        // Clear the canvas before we start drawing on it.
+        glutils.prepareViewport(canvas.width, canvas.height);
+
+        // Double buffering texture, one for the previous state, one for the next state
+        // RGB contains the 3 layers snow
+        const state = [
+            glutils.texture(textureWidth, textureHeight),
+            glutils.texture(textureWidth, textureHeight)
+        ];
+        let currentTextureIndex = 0;
+
+        // Initialize snow, each white dot is a snow drawn by the fragment shader
+        let snow_count = glutils.initializeSnowState(state[currentTextureIndex]);
+
+        const backgroundTexture = glutils.texture(textureWidth, textureHeight);
+        await glutils.prepareEnvironment(backgroundTexture, framebuffer);
+
+        // Prepare textures for drawing main loop
+        let traineau_image: HTMLImageElement = await glutils.getImageData("traineau.png");
+
+        gl.activeTexture(gl.TEXTURE0 + 1);
+        gl.bindTexture(gl.TEXTURE_2D, backgroundTexture);
+        gl.activeTexture(gl.TEXTURE0 + 2);
+        glutils.textureFromImage(traineau_image);
+
+        gl.activeTexture(gl.TEXTURE0);
+
+
+        gl.useProgram(programInfo.program);
+        // Set the shader uniforms
+        gl.uniform4f(programInfo.uniformLocations.position, 0, 0, 1, 1);
+        gl.uniform4f(
+            programInfo.uniformLocations.scale,
+            textureWidth,
+            textureHeight,
+            canvas.width,
+            canvas.height,
+        );
+        gl.uniform1i(
+            programInfo.uniformLocations.state,
+            0,
+        );
+        gl.uniform1i(programInfo.uniformLocations.state, 0);
+        gl.uniform1i(programInfo.uniformLocations.backgroundTexture, 1);
+
+
+        gl.useProgram(programCopyInfo.program);
+        // Set the shader uniforms
+        gl.uniform4f(programCopyInfo.uniformLocations.position, 0, 0, 1, 1);
+        gl.uniform4f(
+            programCopyInfo.uniformLocations.scale,
+            textureWidth,
+            textureHeight,
+            canvas.width,
+            canvas.height,
+        );
+        gl.uniform1i(programCopyInfo.uniformLocations.state, 0);
+        gl.uniform1i(programCopyInfo.uniformLocations.backgroundTexture, 1);
+        gl.uniform1i(programCopyInfo.uniformLocations.traineauTexture, 2);
+
+
+        let runtimeState = {
+            frameCount: 0,
+            x: -1,
+            y: -1,
+            traineauPosition: canvas.width,
+        }
+        monitorFPS(canvas, runtimeState, snow_count);
+
+        handleInteractions(canvas, runtimeState);
+        
+
+        const fpsInterval = 1000 / 61.0;
+        let expectedFrameDate = Date.now();
+
+        function updateAnimation(timestamp: DOMHighResTimeStamp) {
+            let now = Date.now();
+            if (now >= expectedFrameDate) {
+                expectedFrameDate += Math.trunc((now - expectedFrameDate) / fpsInterval + 1) * fpsInterval;
+
+                runtimeState.frameCount++;
+                {
+                    gl.activeTexture(gl.TEXTURE0);
+                    gl.bindTexture(gl.TEXTURE_2D, state[currentTextureIndex]);
+                    if(runtimeState.x != -1 && runtimeState.y != -1) {
+                        runtimeState.x = runtimeState.x / window.innerWidth * canvas.width;
+                        runtimeState.y = runtimeState.y / window.innerHeight * canvas.height;
+                        gl.texSubImage2D(gl.TEXTURE_2D, 0, runtimeState.x, runtimeState.y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 128, 0, 0]));
+                        runtimeState.x = runtimeState.y = -1;
+                    }
+                    currentTextureIndex = currentTextureIndex == 1 ? 0 : 1;
+
+                    // Render to texture
+                    gl.useProgram(programInfo.program);
+                    // Set the shader uniforms
+                    gl.uniform2f(
+                        programInfo.uniformLocations.random,
+                        Math.random(),
+                        Math.random(),
+                    );
+                    gl.uniform1f(programInfo.uniformLocations.time, (now % 1000) / 1000.0);
+                    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+                    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, state[currentTextureIndex], 0);
+
+                    gl.disable(gl.BLEND);
+                    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+                    // Render to screen
+                    gl.useProgram(programCopyInfo.program);
+                    gl.uniform1f(programCopyInfo.uniformLocations.time, (now % 2000) * (1.0 / 2000.0));
+                    gl.uniform2f(programCopyInfo.uniformLocations.traineauPosition, runtimeState.traineauPosition, canvas.height - 100.0);
+                    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+                    gl.enable(gl.BLEND);
+                    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+                    runtimeState.traineauPosition -= 1;
+                    if (runtimeState.traineauPosition < -traineau_image.width)
+                        runtimeState.traineauPosition = canvas.width * 2;
+                }
+            }
+
+            window.requestAnimationFrame(updateAnimation);
+        }
         window.requestAnimationFrame(updateAnimation);
-    }
-    window.requestAnimationFrame(updateAnimation);
-})();
+    },
+    500);
+}
