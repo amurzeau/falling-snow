@@ -104,8 +104,8 @@ window.onload = function() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
         
-        let ratio_w = canvas.width / 800.0;
-        let ratio_h = canvas.height / 400.0;
+        let ratio_w = canvas.width / 400.0;
+        let ratio_h = canvas.height / 200.0;
 
         if(ratio_h > ratio_w) {
             canvas.width /= ratio_w;

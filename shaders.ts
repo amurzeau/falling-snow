@@ -39,9 +39,9 @@ vec4 get_background(sampler2D sampler, vec2 offset, float scale) {
 }
 
 void main() {
-    vec4 texture1 = get_background(backgroundTextures[0], vec2(-10.0, 0.0), 2.0);
-    vec4 texture3 = get_background(backgroundTextures[1], vec2(-256.0, 0.0), 2.0);
-    vec4 texture4 = get_background(backgroundTextures[2], vec2(-600.0, 0.0), 1.5);
+    vec4 texture1 = get_background(backgroundTextures[0], vec2(-10.0, 0.0), 1.0);
+    vec4 texture3 = get_background(backgroundTextures[1], vec2(-128.0, 0.0), 1.0);
+    vec4 texture4 = get_background(backgroundTextures[2], vec2(-300.0, 0.0), 0.75);
 
     vec4 blend = texture1.rgba;
     blend = mix(blend, texture3.rgba, texture3.a);
@@ -111,7 +111,7 @@ float get_environment(vec2 offset) {
 // Bit 1: if 1: medium snow is present
 // Bit 2: unused
 // Bit 3: if 1: fast snow is present
-float get_falling_snow_state(bool particule_fall_bottom_and_appears) {
+float get_falling_snow_state() {
     // Get state above
     // Color contains particule presence
     // Alpha contains if particule touched bottom
@@ -238,20 +238,20 @@ void main() {
             : max(particule_age_origin - 0.0001, 0.0);
 
     float current_smoke_age = get_snow_bottom(vec2(0.0, 0.0)).a;
-    float ratio_height = clamp((gl_FragCoord.y - 70.0*2.0) / 40.0, 0.0, 1.0);
+    float ratio_height = clamp((gl_FragCoord.y - 70.0) / 40.0, 0.0, 1.0);
     vec2 smoke_origin = vec2(0.0, -1.0);
     smoke_origin = rotate(smoke_origin, (ratio_height*2.0 + 2.0*sin((0.1+ratio_height) * random.x * gl_FragCoord.y * gl_FragCoord.x)) * (-0.25 * 3.14159));
     smoke_origin = (1.0 + 5.0*ratio_height)*smoke_origin;
     float smoke_source = get_snow_bottom(smoke_origin).a * 1.01;
     float speed = (2.0 - ratio_height) * 0.1;
-    float smoke_age = insideBox(gl_FragCoord.xy, vec2(10.0+15.0*2.0, 69.0*2.0), vec2(10.0+25.0*2.0, 69.0*2.0 + 2.0)) > 0.0 ? 1.0 :
+    float smoke_age = insideBox(gl_FragCoord.xy, vec2(10.0+15.0, 69.0), vec2(10.0+25.0, 71.0)) > 0.0 ? 1.0 :
     (
         min(current_smoke_age * (1.0 - speed) + speed * smoke_source, 1.0)
     );
 
 
     fragColor = vec4(
-        get_falling_snow_state(particule_fall_bottom_and_appears),
+        get_falling_snow_state(),
         encode_snow_particules(particule_is_present ? particule_age : 0.0),
         smoke_age
     );
@@ -350,7 +350,7 @@ vec2 eiffelLight(float time) {
     float cone_angle = pi2 / 300.0;
     float tower_z_distance = 100.0;
 
-    vec2 beam_source_distance = gl_FragCoord.xy - vec2(600.0 + 61.5*1.5, 228.0*1.5);
+    vec2 beam_source_distance = gl_FragCoord.xy - vec2(300.0 + 61.5*0.75, 228.0*0.75);
 
     // Intersection between beam and camera vision
     // Vue de dessus, cas 1
@@ -379,7 +379,7 @@ vec2 eiffelLight(float time) {
     // For Y
     // Beam is a cone
     // Beam height depend on beam_distance, farther = larger
-    float beam_height = tan(cone_angle) * beam_distance - 0.15;
+    float beam_height = tan(cone_angle) * beam_distance - 0.07;
     beam_height += step(0.0, beam_height)*2.0;
 
     float ratio_y = clamp(beam_height - abs(beam_source_distance.y), 0.0, 0.5);
@@ -431,33 +431,33 @@ vec4 blend_color() {
     float light_power_1 = 1.0 * (step(0.5, fract(lightTime)));
     float light_power_2 = 1.0 * (1.0 - step(0.5, fract(lightTime)));
 
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 7.0  * 2.0, 33.0*2.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_1, 30.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 11.0 * 2.0, 33.0*2.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_2, 30.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 16.0 * 2.0, 33.0*2.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_1, 30.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 20.0 * 2.0, 33.0*2.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_2, 30.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 25.0 * 2.0, 33.0*2.0), vec4(1.000, 0.000, 0.585, 1.0), light_power_1, 30.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 29.0 * 2.0, 33.0*2.0), vec4(1.000, 0.000, 0.440, 1.0), light_power_2, 30.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 33.0 * 2.0, 33.0*2.0), vec4(1.000, 0.533, 0.000, 1.0), light_power_1, 30.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 38.0 * 2.0, 33.0*2.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_2, 30.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 42.0 * 2.0, 33.0*2.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_1, 30.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 47.0 * 2.0, 33.0*2.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_2, 30.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 51.0 * 2.0, 33.0*2.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_1, 30.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 56.0 * 2.0, 33.0*2.0), vec4(1.000, 0.000, 0.585, 1.0), light_power_2, 30.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 60.0 * 2.0, 33.0*2.0), vec4(1.000, 0.000, 0.440, 1.0), light_power_1, 30.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 64.0 * 2.0, 33.0*2.0), vec4(1.000, 0.533, 0.000, 1.0), light_power_2, 30.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 69.0 * 2.0, 33.0*2.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_1, 30.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 73.0 * 2.0, 33.0*2.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_2, 30.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 78.0 * 2.0, 33.0*2.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_1, 30.0);
-    texture_with_light += apply_light(background_texture, vec2(10.0 + 82.0 * 2.0, 33.0*2.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_2, 30.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 7.0 , 33.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_1, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 11.0, 33.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_2, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 16.0, 33.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_1, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 20.0, 33.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_2, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 25.0, 33.0), vec4(1.000, 0.000, 0.585, 1.0), light_power_1, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 29.0, 33.0), vec4(1.000, 0.000, 0.440, 1.0), light_power_2, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 33.0, 33.0), vec4(1.000, 0.533, 0.000, 1.0), light_power_1, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 38.0, 33.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_2, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 42.0, 33.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_1, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 47.0, 33.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_2, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 51.0, 33.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_1, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 56.0, 33.0), vec4(1.000, 0.000, 0.585, 1.0), light_power_2, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 60.0, 33.0), vec4(1.000, 0.000, 0.440, 1.0), light_power_1, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 64.0, 33.0), vec4(1.000, 0.533, 0.000, 1.0), light_power_2, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 69.0, 33.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_1, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 73.0, 33.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_2, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 78.0, 33.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_1, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 82.0, 33.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_2, 15.0);
 
     // Sapin 2
     light_power_1 = 1.0 * (step(0.5, fract(lightTime + 0.4)));
     light_power_2 = 1.0 * (1.0 - step(0.5, fract(lightTime + 0.4)));
-    texture_with_light += apply_light(background_texture, vec2(256.0 + 39.0*2.0, 19.0*2.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_1, 1000.0);
-    texture_with_light += apply_light(background_texture, vec2(256.0 + 92.0*2.0, 15.0*2.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_2, 1000.0);
-    texture_with_light += apply_light(background_texture, vec2(256.0 + 69.0*2.0, 35.0*2.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_2, 1000.0);
-    texture_with_light += apply_light(background_texture, vec2(256.0 + 72.0*2.0, 75.0*2.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_1, 1000.0);
-    texture_with_light += apply_light(background_texture, vec2(256.0 + 57.0*2.0, 83.0*2.0), vec4(1.000, 0.000, 0.585, 1.0), light_power_2, 1000.0);
+    texture_with_light += apply_light(background_texture, vec2(128.0 + 39.0, 19.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_1, 500.0);
+    texture_with_light += apply_light(background_texture, vec2(128.0 + 92.0, 15.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_2, 500.0);
+    texture_with_light += apply_light(background_texture, vec2(128.0 + 69.0, 35.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_2, 500.0);
+    texture_with_light += apply_light(background_texture, vec2(128.0 + 72.0, 75.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_1, 500.0);
+    texture_with_light += apply_light(background_texture, vec2(128.0 + 57.0, 83.0), vec4(1.000, 0.000, 0.585, 1.0), light_power_2, 500.0);
 
     texture_with_light = clamp(texture_with_light, 0.0, 1.0);
 
@@ -465,37 +465,36 @@ vec4 blend_color() {
     // Final color
     vec3 blendedColor = vec3(0.0);
     blendedColor = blendTexelFetch(blendedColor, traineauTexture, vec2(-traineauPosition), vec2(1.0));
-    blendedColor = blendTexture(blendedColor, backgroundTreesTexture, vec2(0.0, -50.0), vec2(scale.z/5.0, scale.w/5.0));
+    blendedColor = blendTexture(blendedColor, backgroundTreesTexture, vec2(0.0, -25.0), vec2(scale.z/5.0, scale.w/5.0));
 
     float ditheringRatio = fract(gl_FragCoord.x * 0.123456 + gl_FragCoord.y * 0.61432)*0.1 + 0.9;
-    vec4 backgroud_fade_floor = vec4(vec3(smoothstep(200.0, 0.0, gl_FragCoord.y)/1.5 * ditheringRatio), 1.0);
-    backgroud_fade_floor *= 1.0 - step(50.0, gl_FragCoord.y);
+    vec4 backgroud_fade_floor = vec4(vec3(smoothstep(100.0, 0.0, gl_FragCoord.y)/1.5 * ditheringRatio), 1.0);
+    backgroud_fade_floor *= 1.0 - step(25.0, gl_FragCoord.y);
 
     // Eiffel lightning
     vec2 eiffelLighting = eiffelLight(time);
+    float eiffelLightingBefore = step(pi2/4.0, abs(eiffelLighting.y));
 
-    if(eiffelLighting.y < -pi2/4.0 || eiffelLighting.y > pi2/4.0) {
-        blendedColor += 1.0 * eiffelLighting.x;
-        blendedColor = clamp(blendedColor, 0.0, 1.0);
-    }
+    blendedColor += eiffelLightingBefore * eiffelLighting.x;
+    blendedColor = clamp(blendedColor, 0.0, 1.0);
     
     blendedColor = mix(blendedColor, snow_value.xxx, snow_value.x);
     
     blendedColor = mix(blendedColor, backgroud_fade_floor.rgb, backgroud_fade_floor.a);
     
-    blendedColor = blendTexelFetch(blendedColor, maisonTexture, vec2(-200.0, -35.0), vec2(0.6));
-    blendedColor = blendTexelFetch(blendedColor, maisonTexture, vec2(-450.0, -35.0), vec2(0.6));
-    blendedColor = blendTexelFetch(blendedColor, maisonTexture, vec2(-700.0, -35.0), vec2(0.6));
+    blendedColor = blendTexelFetch(blendedColor, maisonTexture, vec2(-200.0/2.0, -35.0/2.0), vec2(0.6)/2.0);
+    blendedColor = blendTexelFetch(blendedColor, maisonTexture, vec2(-450.0/2.0, -35.0/2.0), vec2(0.6)/2.0);
+    blendedColor = blendTexelFetch(blendedColor, maisonTexture, vec2(-700.0/2.0, -35.0/2.0), vec2(0.6)/2.0);
 
-    blendedColor = blendTexelFetch(blendedColor, sapinTexture, vec2(-750.0, -30.0), vec2(0.5));
+    blendedColor = blendTexelFetch(blendedColor, sapinTexture, vec2(-750.0/2.0, -30.0/2.0), vec2(0.5)/2.0);
 
-    blendedColor = blendTexelFetch(blendedColor, maisonTexture, vec2(-100.0, -25.0), vec2(0.7));
-    blendedColor = blendTexelFetch(blendedColor, maisonTexture, vec2(-800.0, -25.0), vec2(0.7));
-    blendedColor = blendTexelFetch(blendedColor, sapinTexture, vec2(-600.0, -25.0), vec2(0.6));
+    blendedColor = blendTexelFetch(blendedColor, maisonTexture, vec2(-100.0/2.0, -25.0/2.0), vec2(0.7)/2.0);
+    blendedColor = blendTexelFetch(blendedColor, maisonTexture, vec2(-800.0/2.0, -25.0/2.0), vec2(0.7)/2.0);
+    blendedColor = blendTexelFetch(blendedColor, sapinTexture, vec2(-600.0/2.0, -25.0/2.0), vec2(0.6)/2.0);
 
-    blendedColor = blendTexelFetch(blendedColor, maisonTexture, vec2(-250.0, -15.0), vec2(0.8));
-    blendedColor = blendTexelFetch(blendedColor, maisonTexture, vec2(-500.0, -15.0), vec2(0.8));
-    blendedColor = blendTexelFetch(blendedColor, maisonTexture, vec2(-850.0, -15.0), vec2(0.8));
+    blendedColor = blendTexelFetch(blendedColor, maisonTexture, vec2(-250.0/2.0, -15.0/2.0), vec2(0.8)/2.0);
+    blendedColor = blendTexelFetch(blendedColor, maisonTexture, vec2(-500.0/2.0, -15.0/2.0), vec2(0.8)/2.0);
+    blendedColor = blendTexelFetch(blendedColor, maisonTexture, vec2(-850.0/2.0, -15.0/2.0), vec2(0.8)/2.0);
 
 
     blendedColor = mix(blendedColor, snow_value.yyy, snow_value.y);
@@ -503,10 +502,8 @@ vec4 blend_color() {
     blendedColor = mix(blendedColor, snow_value.zzz, snow_value.z);
 
 
-    if(eiffelLighting.y >= -pi2/4.0 && eiffelLighting.y <= pi2/4.0) {
-        blendedColor += 1.0 * eiffelLighting.x;
-        blendedColor = clamp(blendedColor, 0.0, 1.0);
-    }
+    blendedColor += (1.0 - eiffelLightingBefore) * eiffelLighting.x;
+    blendedColor = clamp(blendedColor, 0.0, 1.0);
 
     // Smoke
     vec4 texel = texture(state, gl_FragCoord.xy / scale.xy);
