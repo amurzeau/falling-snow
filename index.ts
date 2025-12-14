@@ -115,8 +115,8 @@ window.onload = function() {
             canvas.height /= ratio_h;
         }
 
-        canvas.style.width = window.innerWidth + "px";
-        canvas.style.height = window.innerHeight + "px";
+        canvas.style.width = "100%";
+        canvas.style.height = "100%";
 
         let gl = glutils.initOpenGL(canvas);
 
