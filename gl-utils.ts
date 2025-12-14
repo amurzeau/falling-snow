@@ -225,7 +225,6 @@ export async function prepareEnvironment(backgroundTexture: WebGLTexture | null,
     let maison_image: HTMLImageElement = await getImageData("maison.png");
     let sapin_image: HTMLImageElement = await getImageData("sapin.png");
     let eiffel_image: HTMLImageElement = await getImageData("tour_eiffel.png");
-    let background_trees: HTMLImageElement = await getImageData("background_trees.png");
 
     gl.activeTexture(gl.TEXTURE0 + 1);
     const maisonTexture = textureFromImage(maison_image);

@@ -32,7 +32,7 @@ precision highp float;
 #endif
 
 out vec4 fragColor;
-uniform sampler2D backgroundTextures[4];
+uniform sampler2D backgroundTextures[3];
 
 vec4 get_background(sampler2D sampler, vec2 offset, float scale) {
     return texelFetch(sampler, ivec2((gl_FragCoord.xy + offset) / scale), 0);
