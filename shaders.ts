@@ -342,6 +342,52 @@ vec3 blendTexture(vec3 blendedColor, sampler2D textureSampler, vec2 offset, vec2
     return mix(blendedColor, texel.rgb * 0.5, texel.a);
 }
 
+const float pi2 = 2.0 * 3.14159;
+
+vec2 eiffelLight(float time) {
+    // Eiffel light
+
+    float angle = time * pi2 - pi2/2.0;
+
+    float cone_angle = pi2 / 300.0;
+    float tower_z_distance = 100.0;
+
+    vec2 beam_source_distance = gl_FragCoord.xy - vec2(661.5, 228.0);
+
+    // Intersection between beam and camera vision
+    // Vue de dessus, cas 1
+    //
+    //          *
+    //         /
+    //        /
+    //       /
+    //      /
+    //     /
+    // ----+------------------
+    // Vue de dessus, cas 2
+    //
+    //         -*
+    //       --
+    //     +-
+    //   --|
+    // --  |
+    // -----------------------
+    float z_distance = tower_z_distance - beam_source_distance.x / tan(angle);
+    float beam_distance = beam_source_distance.x / sin(angle);
+
+    float light_distance = abs(beam_distance + z_distance);
+    float distance_pow2 = dot(light_distance, light_distance);
+
+    // For Y
+    // Beam is a cone
+    // Beam height depend on beam_distance, farther = larger
+    float beam_height = tan(cone_angle) * beam_distance - 0.1;
+    beam_height += step(0.0, beam_height)*2.0;
+
+    float ratio_y = clamp(beam_height - abs(beam_source_distance.y), 0.0, 1.0);
+    return vec2(ratio_y * 10000.0 / distance_pow2, angle);
+}
+
 vec4 blend_color() {
     vec3 snow_value;
     
@@ -381,9 +427,11 @@ vec4 blend_color() {
     // Ambiant light
     texture_with_light += background_texture * vec4(vec3(0.5), 1.0);
 
+    float lightTime = time * 5.0;
+
     // 17 lights for house
-    float light_power_1 = 1.0 * (step(0.5, time));
-    float light_power_2 = 1.0 * (1.0 - step(0.5, time));
+    float light_power_1 = 1.0 * (step(0.5, fract(lightTime)));
+    float light_power_2 = 1.0 * (1.0 - step(0.5, fract(lightTime)));
 
     texture_with_light += apply_light(background_texture, vec2(10.0 + 7.0 , 33.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_1, 15.0);
     texture_with_light += apply_light(background_texture, vec2(10.0 + 11.0, 33.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_2, 15.0);
@@ -405,8 +453,8 @@ vec4 blend_color() {
     texture_with_light += apply_light(background_texture, vec2(10.0 + 82.0, 33.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_2, 15.0);
 
     // Sapin 1
-    light_power_1 = 1.0 * (step(0.5, fract(time + 0.7)));
-    light_power_2 = 1.0 * (1.0 - step(0.5, fract(time + 0.7)));
+    light_power_1 = 1.0 * (step(0.5, fract(lightTime + 0.7)));
+    light_power_2 = 1.0 * (1.0 - step(0.5, fract(lightTime + 0.7)));
     texture_with_light += apply_light(background_texture, vec2(120.0 + 39.0, 19.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_1, 500.0);
     texture_with_light += apply_light(background_texture, vec2(120.0 + 92.0, 15.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_2, 500.0);
     texture_with_light += apply_light(background_texture, vec2(120.0 + 69.0, 35.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_2, 500.0);
@@ -414,8 +462,8 @@ vec4 blend_color() {
     texture_with_light += apply_light(background_texture, vec2(120.0 + 57.0, 83.0), vec4(1.000, 0.000, 0.585, 1.0), light_power_2, 500.0);
 
     // Sapin 2
-    light_power_1 = 1.0 * (step(0.5, fract(time + 0.4)));
-    light_power_2 = 1.0 * (1.0 - step(0.5, fract(time + 0.4)));
+    light_power_1 = 1.0 * (step(0.5, fract(lightTime + 0.4)));
+    light_power_2 = 1.0 * (1.0 - step(0.5, fract(lightTime + 0.4)));
     texture_with_light += apply_light(background_texture, vec2(256.0 + 39.0*2.0, 19.0*2.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_1, 1000.0);
     texture_with_light += apply_light(background_texture, vec2(256.0 + 92.0*2.0, 15.0*2.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_2, 1000.0);
     texture_with_light += apply_light(background_texture, vec2(256.0 + 69.0*2.0, 35.0*2.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_2, 1000.0);
@@ -425,6 +473,7 @@ vec4 blend_color() {
     texture_with_light = clamp(texture_with_light, 0.0, 1.0);
 
 
+    // Final color
     vec3 blendedColor = vec3(0.0);
     blendedColor = blendTexelFetch(blendedColor, traineauTexture, vec2(-traineauPosition), vec2(1.0));
     blendedColor = blendTexture(blendedColor, backgroundTreesTexture, vec2(0.0, -50.0), vec2(scale.z/5.0, scale.w/5.0));
@@ -433,6 +482,13 @@ vec4 blend_color() {
     vec4 backgroud_fade_floor = vec4(vec3(smoothstep(200.0, 0.0, gl_FragCoord.y)/1.5 * ditheringRatio), 1.0);
     backgroud_fade_floor *= 1.0 - step(50.0, gl_FragCoord.y);
 
+    // Eiffel lightning
+    vec2 eiffelLighting = eiffelLight(time);
+
+    if(eiffelLighting.y < -pi2/4.0 || eiffelLighting.y > pi2/4.0) {
+        blendedColor += 1.0 * eiffelLighting.x;
+        blendedColor = clamp(blendedColor, 0.0, 1.0);
+    }
     
     blendedColor = mix(blendedColor, snow_value.xxx, snow_value.x);
     
@@ -451,13 +507,17 @@ vec4 blend_color() {
     blendedColor = blendTexelFetch(blendedColor, maisonTexture, vec2(-250.0, -15.0), vec2(0.8));
     blendedColor = blendTexelFetch(blendedColor, maisonTexture, vec2(-500.0, -15.0), vec2(0.8));
     blendedColor = blendTexelFetch(blendedColor, maisonTexture, vec2(-850.0, -15.0), vec2(0.8));
-    blendedColor = blendTexelFetch(blendedColor, sapinTexture, vec2(0.0, -15.0), vec2(0.8));
 
-    
+
     blendedColor = mix(blendedColor, snow_value.yyy, snow_value.y);
     blendedColor = mix(blendedColor, texture_with_light.rgb, texture_with_light.a);
     blendedColor = mix(blendedColor, snow_value.zzz, snow_value.z);
 
+
+    if(eiffelLighting.y >= -pi2/4.0 && eiffelLighting.y <= pi2/4.0) {
+        blendedColor += 1.0 * eiffelLighting.x;
+        blendedColor = clamp(blendedColor, 0.0, 1.0);
+    }
 
     // Smoke
     vec4 texel = texture(state, gl_FragCoord.xy / scale.xy);

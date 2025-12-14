@@ -286,7 +286,7 @@ window.onload = function() {
 
                     // Render to screen
                     gl.useProgram(programCopyInfo.program);
-                    gl.uniform1f(programCopyInfo.uniformLocations.time, (now % 2000) * (1.0 / 2000.0));
+                    gl.uniform1f(programCopyInfo.uniformLocations.time, (now % 10000) / 10000.0);
                     gl.uniform2f(programCopyInfo.uniformLocations.traineauPosition, runtimeState.traineauPosition, canvas.height - 100.0);
                     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
                     gl.enable(gl.BLEND);
