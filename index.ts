@@ -103,10 +103,16 @@ window.onload = function() {
         // Adjust canvas size to an appropriate zoom to avoid too much pixel to be drawn by fragment shader
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
+        
+        let ratio_w = canvas.width / 800.0;
+        let ratio_h = canvas.height / 400.0;
 
-        while(canvas.width > 512 && canvas.height > 512) {
-            canvas.width /= 2.0;
-            canvas.height /= 2.0;
+        if(ratio_h > ratio_w) {
+            canvas.width /= ratio_w;
+            canvas.height /= ratio_w;
+        } else {
+            canvas.width /= ratio_h;
+            canvas.height /= ratio_h;
         }
 
         canvas.style.width = window.innerWidth + "px";
