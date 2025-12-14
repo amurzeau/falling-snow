@@ -384,7 +384,7 @@ vec2 eiffelLight(float time) {
     float beam_height = tan(cone_angle) * beam_distance - 0.1;
     beam_height += step(0.0, beam_height)*2.0;
 
-    float ratio_y = clamp(beam_height - abs(beam_source_distance.y), 0.0, 1.0);
+    float ratio_y = clamp(beam_height - abs(beam_source_distance.y), 0.0, 0.5);
     return vec2(ratio_y * 10000.0 / distance_pow2, angle);
 }
 
