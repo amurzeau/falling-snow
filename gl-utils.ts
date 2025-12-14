@@ -180,6 +180,11 @@ export function prepareViewport(width, height) {
     gl.viewport(0, 0, width, height);
 }
 
+// State bits:
+// Bit 0: if 1: slow, far snow is present
+// Bit 1: if 1: medium snow is present
+// Bit 2: unused
+// Bit 3: if 1: fast snow is present
 export function initializeSnowState(state: WebGLTexture) {
     let rand = new Uint8Array(canvas.width * (canvas.height+1) * 4);
     let snow_count = 0;
@@ -187,10 +192,10 @@ export function initializeSnowState(state: WebGLTexture) {
     for(let i = 0; i < rand.length; i += 4) {
         rand[i + 0] =
             ((Math.random() < 0.0006 ? 1 : 0) << 0) |
-            ((Math.random() < 0.00015 ? 3 : 0) << 1) |
+            ((Math.random() < 0.00015 ? 1 : 0) << 1) |
             ((Math.random() < 0.0001 ? 1 : 0) << 3);
 
-        if(rand[i + 0] & 0x6) {
+        if(rand[i + 0] & 0x2) {
             snow_count++;
         }
 
@@ -219,14 +224,15 @@ export async function prepareEnvironment(backgroundTexture: WebGLTexture | null,
 
     let maison_image: HTMLImageElement = await getImageData("maison.png");
     let sapin_image: HTMLImageElement = await getImageData("sapin.png");
-    let bigben_image: HTMLImageElement = await getImageData("bigben.png");
+    let eiffel_image: HTMLImageElement = await getImageData("tour_eiffel.png");
+    let background_trees: HTMLImageElement = await getImageData("background_trees.png");
 
     gl.activeTexture(gl.TEXTURE0 + 1);
     const maisonTexture = textureFromImage(maison_image);
     gl.activeTexture(gl.TEXTURE0 + 2);
     const sapinTexture = textureFromImage(sapin_image);
     gl.activeTexture(gl.TEXTURE0 + 3);
-    const bigbenTexture = textureFromImage(bigben_image);
+    const eiffelTexture = textureFromImage(eiffel_image);
 
     // Render to texture
     gl.useProgram(programProcessEnvironmentInfo.program);
@@ -240,6 +246,6 @@ export async function prepareEnvironment(backgroundTexture: WebGLTexture | null,
 
     gl.deleteTexture(maisonTexture);
     gl.deleteTexture(sapinTexture);
-    gl.deleteTexture(bigbenTexture);
+    gl.deleteTexture(eiffelTexture);
     gl.deleteProgram(programProcessEnvironmentInfo.program);
 }

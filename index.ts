@@ -147,6 +147,9 @@ window.onload = function() {
                 backgroundTexture: gl.getUniformLocation(shaderCopyProgram, "backgroundTexture"),
                 traineauTexture: gl.getUniformLocation(shaderCopyProgram, "traineauTexture"),
                 traineauPosition: gl.getUniformLocation(shaderCopyProgram, "traineauPosition"),
+                backgroundTreesTexture: gl.getUniformLocation(shaderCopyProgram, "backgroundTreesTexture"),
+                maisonTexture: gl.getUniformLocation(shaderCopyProgram, "maisonTexture"),
+                sapinTexture: gl.getUniformLocation(shaderCopyProgram, "sapinTexture"),
             },
         };
 
@@ -175,11 +178,26 @@ window.onload = function() {
 
         // Prepare textures for drawing main loop
         let traineau_image: HTMLImageElement = await glutils.getImageData("traineau.png");
+        let background_trees_image: HTMLImageElement = await glutils.getImageData("background_trees.png");
+        let maison_image: HTMLImageElement = await glutils.getImageData("maison.png");
+        let sapin_image: HTMLImageElement = await glutils.getImageData("sapin.png");
 
         gl.activeTexture(gl.TEXTURE0 + 1);
         gl.bindTexture(gl.TEXTURE_2D, backgroundTexture);
+
         gl.activeTexture(gl.TEXTURE0 + 2);
         glutils.textureFromImage(traineau_image);
+
+        gl.activeTexture(gl.TEXTURE0 + 3);
+        glutils.textureFromImage(background_trees_image);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+        gl.activeTexture(gl.TEXTURE0 + 4);
+        glutils.textureFromImage(maison_image);
+
+        gl.activeTexture(gl.TEXTURE0 + 5);
+        glutils.textureFromImage(sapin_image);
 
         gl.activeTexture(gl.TEXTURE0);
 
@@ -215,6 +233,9 @@ window.onload = function() {
         gl.uniform1i(programCopyInfo.uniformLocations.state, 0);
         gl.uniform1i(programCopyInfo.uniformLocations.backgroundTexture, 1);
         gl.uniform1i(programCopyInfo.uniformLocations.traineauTexture, 2);
+        gl.uniform1i(programCopyInfo.uniformLocations.backgroundTreesTexture, 3);
+        gl.uniform1i(programCopyInfo.uniformLocations.maisonTexture, 4);
+        gl.uniform1i(programCopyInfo.uniformLocations.sapinTexture, 5);
 
 
         let runtimeState = {

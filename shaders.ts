@@ -32,7 +32,7 @@ precision highp float;
 #endif
 
 out vec4 fragColor;
-uniform sampler2D backgroundTextures[3];
+uniform sampler2D backgroundTextures[4];
 
 vec4 get_background(sampler2D sampler, vec2 offset, float scale) {
     return texelFetch(sampler, ivec2((gl_FragCoord.xy + offset) / scale), 0);
@@ -42,7 +42,7 @@ void main() {
     vec4 texture1 = get_background(backgroundTextures[0], vec2(-10.0, 0.0), 1.0);
     vec4 texture2 = get_background(backgroundTextures[1], vec2(-120.0, 0.0), 1.0);
     vec4 texture3 = get_background(backgroundTextures[1], vec2(-256.0, 0.0), 2.0);
-    vec4 texture4 = get_background(backgroundTextures[2], vec2(-600.0, 0.0), 2.0);
+    vec4 texture4 = get_background(backgroundTextures[2], vec2(-600.0, 0.0), 1.0);
 
     vec4 blend = texture1.rgba;
     blend = mix(blend, texture2.rgba, texture2.a);
@@ -92,9 +92,7 @@ int get_wrapped_falling_snow(vec2 offset) {
 
     // Snow flake position is encoded in first component only
     int value = float2int(texture(state, wrapped_coord / scale.xy).x);
-    if(new_flake > 0.0) {
-        value |= 0x04;
-    }
+
     return value;
 }
 
@@ -110,13 +108,18 @@ float get_environment(vec2 offset) {
     return texture(backgroundTexture, (wrapped_coord / scale.xy)).a;
 }
 
-float get_falling_snow_state() {
+// State bits:
+// Bit 0: if 1: slow, far snow is present
+// Bit 1: if 1: medium snow is present
+// Bit 2: unused
+// Bit 3: if 1: fast snow is present
+float get_falling_snow_state(bool particule_fall_bottom_and_appears) {
     // Get state above
     // Color contains particule presence
     // Alpha contains if particule touched bottom
-    int particle_slow =   get_wrapped_falling_snow(vec2(0.0, 1.0)) & 0x1;
-    int particle_medium = get_wrapped_falling_snow(vec2(0.0, 2.0)) & (0x2 | 0x4);
-    int particle_fast =   get_wrapped_falling_snow(vec2(0.0, 4.0)) & 0x8;
+    int particle_slow =   get_wrapped_falling_snow(vec2(0.0, 1.0)) & 0x01;
+    int particle_medium = get_wrapped_falling_snow(vec2(0.0, 2.0)) & 0x02;
+    int particle_fast =   get_wrapped_falling_snow(vec2(0.0, 4.0)) & 0x08;
 
     return float(
         particle_slow |
@@ -144,12 +147,12 @@ vec2 encode_snow_particules(float snow_particule_age) {
     return EncodeFloatRGB(snow_particule_age);
 }
 
-bool get_snow_flake_dropped() {
+bool get_snow_flake_dropping() {
     int snow_present =
         float2int(get_snow_bottom(vec2(0.0, 1.0)).r) |
         float2int(get_snow_bottom(vec2(0.0, 0.0)).r);
 
-    return (snow_present & 0x2) != 0 && (snow_present & 0x4) != 0;
+    return (snow_present & 0x02) != 0;
 }
 
 // return 1 if v inside the box, return 0 otherwise
@@ -169,26 +172,22 @@ void main() {
     // Snow particule gravity
     //vec2 gravity = vec2(0.0, -1.0);
 
-    bool is_environment_below =
-        get_environment(vec2(0.0, 0.0)) == 0.0 &&
-        get_environment(vec2(0.0, -1.0)) > 0.0;
-
-    bool is_environment_here =
-        get_environment(vec2(0.0, 1.0)) == 0.0 &&
-        get_environment(vec2(0.0, 0.0)) > 0.0;
+    bool is_environment_above =
+        get_environment(vec2(0.0, 1.0)) > 0.0;
 
     // Particule propagation:
     // A particule move to current pixel position when there is:
     // - no particule here currently
-    // - no environment
+    // - no environment at position and above
     // - a particule just above
-    // - a above right and right
-    // - a above left and left and left-left, this check ensure sliding particule are not duplicated when they can go left and right
+    // - a particule above right and right
+    // - a particule above left and left and left-left, this check ensure sliding particule are not duplicated when they can go left and right
     bool particule_above = is_snow_arround(0.0, 1.0);
-    bool particule_above_left = (is_snow_arround(-1.0, 1.0) && is_snow_or_env_arround(-1.0, 0.0) && is_snow_or_env_arround(-2.0, 0.0));
     bool particule_above_right = (is_snow_arround(1.0, 1.0) && is_snow_or_env_arround(1.0, 0.0));
+    bool particule_above_left = (is_snow_arround(-1.0, 1.0) && is_snow_or_env_arround(-1.0, 0.0) && is_snow_or_env_arround(-2.0, 0.0));
     bool particule_move_to_here_and_appears =
-        !is_snow_or_env_arround(0.0, 0.0) && (
+        !is_snow_or_env_arround(0.0, 0.0) &&
+        !is_environment_above && (
             particule_above ||
             particule_above_left ||
             particule_above_right
@@ -214,14 +213,14 @@ void main() {
     
     // Snow dropped on floor when there was a snow flake at our position or at above position.
     // Snow that drop on floor move at 2 pixels at once.
-    bool is_snow_flake_dropped = get_snow_flake_dropped();
+    bool is_snow_flake_dropping = get_snow_flake_dropping();
 
 
     // Particule appears because of snow falling and touching the bottom when:
     // - There is snow below but not where we are
     // - A medium particule fall down
     bool particule_fall_bottom_and_appears =
-        is_snow_flake_dropped &&
+        is_snow_flake_dropping &&
         !is_snow_or_env_arround(0.0, 0.0) &&
         is_snow_or_env_arround(0.0, -1.0);
 
@@ -254,7 +253,7 @@ void main() {
 
 
     fragColor = vec4(
-        get_falling_snow_state(),
+        get_falling_snow_state(particule_fall_bottom_and_appears),
         encode_snow_particules(particule_is_present ? particule_age : 0.0),
         smoke_age
     );
@@ -283,6 +282,10 @@ uniform float time;
 uniform sampler2D traineauTexture;
 uniform vec2 traineauPosition;
 
+uniform sampler2D backgroundTreesTexture;
+uniform sampler2D maisonTexture;
+uniform sampler2D sapinTexture;
+
 const vec2 bitEnc = vec2(1.,255.) / 2.0;
 const vec2 bitDec = 1./bitEnc;
 vec2 EncodeFloatRGB (float v) {
@@ -308,13 +311,15 @@ vec4 get(vec2 offset) {
     return texel;
 }
 
-vec2 processSnowFlake(float x, float y, float small, float medium, float large) {
+vec3 processSnowFlake(float x, float y, float small, float medium, float large) {
     vec4 snow_state = get(vec2(x, y));
 
     return
-        vec2(
+        vec3(
             // Back snow flakes
-            snow_state.r * small + snow_state.g * medium,
+            snow_state.r * small,
+            // Mid snow flakes
+            snow_state.g * medium,
             // Front snow flakes and Snow particles age
             snow_state.b * large + snow_state.a * small
         );
@@ -324,11 +329,21 @@ vec4 apply_light(vec4 background_color, vec2 light_position, vec4 color, float r
     vec2 distance = gl_FragCoord.xy - light_position.xy;
     float distance_pow2 = dot(distance, distance);
 
-    return mix(background_color, color, radius / (1.0 + (distance_pow2 / power)));
+    return vec4(clamp(background_color.rgb * vec3(color * (radius / (1.0 + (distance_pow2 / power)))), 0.0, 1.0), background_color.a);
+}
+
+vec3 blendTexelFetch(vec3 blendedColor, sampler2D texture, vec2 offset, vec2 scale) {
+    vec4 texel = texelFetch(texture, ivec2((gl_FragCoord.xy + offset) / scale), 0);
+    return mix(blendedColor, texel.rgb * 0.5, texel.a);
+}
+
+vec3 blendTexture(vec3 blendedColor, sampler2D textureSampler, vec2 offset, vec2 scale) {
+    vec4 texel = texture(textureSampler, (gl_FragCoord.xy + offset) / scale);
+    return mix(blendedColor, texel.rgb * 0.5, texel.a);
 }
 
 vec4 blend_color() {
-    vec2 snow_value;
+    vec3 snow_value;
     
     snow_value =  processSnowFlake(-2.0, -2.0, 0.0, 0.0, 1.0);
     snow_value += processSnowFlake(0.0, -2.0, 0.0, 0.0, 1.0);
@@ -353,58 +368,96 @@ vec4 blend_color() {
     snow_value += processSnowFlake(2.0, 2.0, 0.0, 0.0, 1.0);
 
     // If snow particule age > 0.0, then make it 1.0
-    snow_value = ceil(min(snow_value, vec2(1.0)));
+    snow_value = ceil(min(snow_value, vec3(1.0)));
 
     // Texture with images
-    vec4 texture_with_light = texture(backgroundTexture, gl_FragCoord.xy / scale.xy);
+    vec4 background_texture = texture(backgroundTexture, gl_FragCoord.xy / scale.xy);
+
+    //background_texture = mix(backgroud_fade_floor, background_texture, background_texture.a);
+    vec4 texture_with_light = vec4(0.0);
+
     // Add lights
+
+    // Ambiant light
+    texture_with_light += background_texture * vec4(vec3(0.5), 1.0);
 
     // 17 lights for house
     float light_power_1 = 1.0 * (step(0.5, time));
     float light_power_2 = 1.0 * (1.0 - step(0.5, time));
 
-    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 7.0 , 33.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_1, 6.0);
-    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 11.0, 33.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_2, 6.0);
-    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 16.0, 33.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_1, 6.0);
-    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 20.0, 33.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_2, 6.0);
-    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 25.0, 33.0), vec4(1.000, 0.000, 0.585, 1.0), light_power_1, 6.0);
-    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 29.0, 33.0), vec4(1.000, 0.000, 0.440, 1.0), light_power_2, 6.0);
-    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 33.0, 33.0), vec4(1.000, 0.533, 0.000, 1.0), light_power_1, 6.0);
-    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 38.0, 33.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_2, 6.0);
-    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 42.0, 33.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_1, 6.0);
-    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 47.0, 33.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_2, 6.0);
-    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 51.0, 33.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_1, 6.0);
-    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 56.0, 33.0), vec4(1.000, 0.000, 0.585, 1.0), light_power_2, 6.0);
-    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 60.0, 33.0), vec4(1.000, 0.000, 0.440, 1.0), light_power_1, 6.0);
-    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 64.0, 33.0), vec4(1.000, 0.533, 0.000, 1.0), light_power_2, 6.0);
-    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 69.0, 33.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_1, 6.0);
-    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 73.0, 33.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_2, 6.0);
-    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 78.0, 33.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_1, 6.0);
-    texture_with_light = apply_light(texture_with_light, vec2(10.0 + 82.0, 33.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_2, 6.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 7.0 , 33.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_1, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 11.0, 33.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_2, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 16.0, 33.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_1, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 20.0, 33.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_2, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 25.0, 33.0), vec4(1.000, 0.000, 0.585, 1.0), light_power_1, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 29.0, 33.0), vec4(1.000, 0.000, 0.440, 1.0), light_power_2, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 33.0, 33.0), vec4(1.000, 0.533, 0.000, 1.0), light_power_1, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 38.0, 33.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_2, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 42.0, 33.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_1, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 47.0, 33.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_2, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 51.0, 33.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_1, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 56.0, 33.0), vec4(1.000, 0.000, 0.585, 1.0), light_power_2, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 60.0, 33.0), vec4(1.000, 0.000, 0.440, 1.0), light_power_1, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 64.0, 33.0), vec4(1.000, 0.533, 0.000, 1.0), light_power_2, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 69.0, 33.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_1, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 73.0, 33.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_2, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 78.0, 33.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_1, 15.0);
+    texture_with_light += apply_light(background_texture, vec2(10.0 + 82.0, 33.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_2, 15.0);
 
     // Sapin 1
     light_power_1 = 1.0 * (step(0.5, fract(time + 0.7)));
     light_power_2 = 1.0 * (1.0 - step(0.5, fract(time + 0.7)));
-    texture_with_light = apply_light(texture_with_light, vec2(120.0 + 39.0, 19.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_1, 120.0);
-    texture_with_light = apply_light(texture_with_light, vec2(120.0 + 92.0, 15.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_2, 120.0);
-    texture_with_light = apply_light(texture_with_light, vec2(120.0 + 69.0, 35.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_2, 120.0);
-    texture_with_light = apply_light(texture_with_light, vec2(120.0 + 72.0, 75.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_1, 120.0);
-    texture_with_light = apply_light(texture_with_light, vec2(120.0 + 57.0, 83.0), vec4(1.000, 0.000, 0.585, 1.0), light_power_2, 120.0);
+    texture_with_light += apply_light(background_texture, vec2(120.0 + 39.0, 19.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_1, 500.0);
+    texture_with_light += apply_light(background_texture, vec2(120.0 + 92.0, 15.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_2, 500.0);
+    texture_with_light += apply_light(background_texture, vec2(120.0 + 69.0, 35.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_2, 500.0);
+    texture_with_light += apply_light(background_texture, vec2(120.0 + 72.0, 75.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_1, 500.0);
+    texture_with_light += apply_light(background_texture, vec2(120.0 + 57.0, 83.0), vec4(1.000, 0.000, 0.585, 1.0), light_power_2, 500.0);
 
     // Sapin 2
     light_power_1 = 1.0 * (step(0.5, fract(time + 0.4)));
     light_power_2 = 1.0 * (1.0 - step(0.5, fract(time + 0.4)));
-    texture_with_light = apply_light(texture_with_light, vec2(256.0 + 39.0*2.0, 19.0*2.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_1, 240.0);
-    texture_with_light = apply_light(texture_with_light, vec2(256.0 + 92.0*2.0, 15.0*2.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_2, 240.0);
-    texture_with_light = apply_light(texture_with_light, vec2(256.0 + 69.0*2.0, 35.0*2.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_2, 240.0);
-    texture_with_light = apply_light(texture_with_light, vec2(256.0 + 72.0*2.0, 75.0*2.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_1, 240.0);
-    texture_with_light = apply_light(texture_with_light, vec2(256.0 + 57.0*2.0, 83.0*2.0), vec4(1.000, 0.000, 0.585, 1.0), light_power_2, 240.0);
+    texture_with_light += apply_light(background_texture, vec2(256.0 + 39.0*2.0, 19.0*2.0), vec4(0.573, 1.000, 0.000, 1.0), light_power_1, 1000.0);
+    texture_with_light += apply_light(background_texture, vec2(256.0 + 92.0*2.0, 15.0*2.0), vec4(1.000, 0.932, 0.000, 1.0), light_power_2, 1000.0);
+    texture_with_light += apply_light(background_texture, vec2(256.0 + 69.0*2.0, 35.0*2.0), vec4(1.000, 0.000, 0.043, 1.0), light_power_2, 1000.0);
+    texture_with_light += apply_light(background_texture, vec2(256.0 + 72.0*2.0, 75.0*2.0), vec4(0.000, 0.700, 1.000, 1.0), light_power_1, 1000.0);
+    texture_with_light += apply_light(background_texture, vec2(256.0 + 57.0*2.0, 83.0*2.0), vec4(1.000, 0.000, 0.585, 1.0), light_power_2, 1000.0);
+
+    texture_with_light = clamp(texture_with_light, 0.0, 1.0);
 
 
-    vec3 blendedColor = texelFetch(traineauTexture, ivec2(gl_FragCoord.xy - traineauPosition), 0).rgb;
+    vec3 blendedColor = vec3(0.0);
+    blendedColor = blendTexelFetch(blendedColor, traineauTexture, vec2(-traineauPosition), vec2(1.0));
+    blendedColor = blendTexture(blendedColor, backgroundTreesTexture, vec2(0.0, -50.0), vec2(scale.z/5.0, scale.w/5.0));
+
+    float ditheringRatio = fract(gl_FragCoord.x * 0.123456 + gl_FragCoord.y * 0.61432)*0.1 + 0.9;
+    vec4 backgroud_fade_floor = vec4(vec3(smoothstep(200.0, 0.0, gl_FragCoord.y)/1.5 * ditheringRatio), 1.0);
+    backgroud_fade_floor *= 1.0 - step(50.0, gl_FragCoord.y);
+
+    
     blendedColor = mix(blendedColor, snow_value.xxx, snow_value.x);
-    blendedColor = mix(blendedColor, texture_with_light.rgb, texture_with_light.a);
+    
+    blendedColor = mix(blendedColor, backgroud_fade_floor.rgb, backgroud_fade_floor.a);
+    
+    blendedColor = blendTexelFetch(blendedColor, maisonTexture, vec2(-200.0, -35.0), vec2(0.6));
+    blendedColor = blendTexelFetch(blendedColor, maisonTexture, vec2(-450.0, -35.0), vec2(0.6));
+    blendedColor = blendTexelFetch(blendedColor, maisonTexture, vec2(-700.0, -35.0), vec2(0.6));
+
+    blendedColor = blendTexelFetch(blendedColor, sapinTexture, vec2(-750.0, -30.0), vec2(0.5));
+
+    blendedColor = blendTexelFetch(blendedColor, maisonTexture, vec2(-100.0, -25.0), vec2(0.7));
+    blendedColor = blendTexelFetch(blendedColor, maisonTexture, vec2(-800.0, -25.0), vec2(0.7));
+    blendedColor = blendTexelFetch(blendedColor, sapinTexture, vec2(-600.0, -25.0), vec2(0.6));
+
+    blendedColor = blendTexelFetch(blendedColor, maisonTexture, vec2(-250.0, -15.0), vec2(0.8));
+    blendedColor = blendTexelFetch(blendedColor, maisonTexture, vec2(-500.0, -15.0), vec2(0.8));
+    blendedColor = blendTexelFetch(blendedColor, maisonTexture, vec2(-850.0, -15.0), vec2(0.8));
+    blendedColor = blendTexelFetch(blendedColor, sapinTexture, vec2(0.0, -15.0), vec2(0.8));
+
+    
     blendedColor = mix(blendedColor, snow_value.yyy, snow_value.y);
+    blendedColor = mix(blendedColor, texture_with_light.rgb, texture_with_light.a);
+    blendedColor = mix(blendedColor, snow_value.zzz, snow_value.z);
+
 
     // Smoke
     vec4 texel = texture(state, gl_FragCoord.xy / scale.xy);
