@@ -42,7 +42,7 @@ void main() {
     vec4 texture1 = get_background(backgroundTextures[0], vec2(-10.0, 0.0), 1.0);
     vec4 texture2 = get_background(backgroundTextures[1], vec2(-120.0, 0.0), 1.0);
     vec4 texture3 = get_background(backgroundTextures[1], vec2(-256.0, 0.0), 2.0);
-    vec4 texture4 = get_background(backgroundTextures[2], vec2(-600.0, 0.0), 1.0);
+    vec4 texture4 = get_background(backgroundTextures[2], vec2(-600.0, 0.0), 1.5);
 
     vec4 blend = texture1.rgba;
     blend = mix(blend, texture2.rgba, texture2.a);
@@ -352,7 +352,7 @@ vec2 eiffelLight(float time) {
     float cone_angle = pi2 / 300.0;
     float tower_z_distance = 100.0;
 
-    vec2 beam_source_distance = gl_FragCoord.xy - vec2(661.5, 228.0);
+    vec2 beam_source_distance = gl_FragCoord.xy - vec2(600.0 + 61.5*1.5, 228.0*1.5);
 
     // Intersection between beam and camera vision
     // Vue de dessus, cas 1
@@ -381,7 +381,7 @@ vec2 eiffelLight(float time) {
     // For Y
     // Beam is a cone
     // Beam height depend on beam_distance, farther = larger
-    float beam_height = tan(cone_angle) * beam_distance - 0.1;
+    float beam_height = tan(cone_angle) * beam_distance - 0.15;
     beam_height += step(0.0, beam_height)*2.0;
 
     float ratio_y = clamp(beam_height - abs(beam_source_distance.y), 0.0, 0.5);
