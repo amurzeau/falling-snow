@@ -15,8 +15,13 @@ function monitorFPS(canvas, runtimeState, snow_count) {
     setInterval(function () {
         let count = runtimeState.frameCount;
         runtimeState.frameCount = 0;
-        fpsElement.textContent = "FPS: " + count + " " + window.devicePixelRatio + " " + canvas.width + " " + canvas.height + " " +
-            (canvas.width * canvas.height / snow_count);
+        if (runtimeState.showFps) {
+            fpsElement.textContent = "FPS: " + count + " " + window.devicePixelRatio + " " + canvas.width + " " + canvas.height + " " +
+                (canvas.width * canvas.height / snow_count);
+        }
+        else {
+            fpsElement.textContent = "";
+        }
     }, 1000);
 }
 function handleInteractions(canvas, runtimeState) {
@@ -28,6 +33,7 @@ function handleInteractions(canvas, runtimeState) {
         if (runtimeState.x != -1 || runtimeState.y != -1) {
             return;
         }
+        runtimeState.showFps = true;
         const rect = canvas.getBoundingClientRect();
         const localX = event.clientX - rect.left;
         const localY = window.innerHeight - (event.clientY - rect.top);
@@ -45,6 +51,7 @@ function handleInteractions(canvas, runtimeState) {
     canvas.addEventListener('mouseup', function (e) {
         if (generateSnowByMouseInterval !== undefined) {
             clearInterval(generateSnowByMouseInterval);
+            runtimeState.showFps = false;
         }
     });
     canvas.addEventListener('mousemove', handleMouseEvent);
@@ -55,6 +62,7 @@ function handleInteractions(canvas, runtimeState) {
         if (event.touches.length == 0)
             return;
         const touchEvent = event.touches[0];
+        runtimeState.showFps = true;
         const rect = canvas.getBoundingClientRect();
         let localX = touchEvent.clientX - rect.left;
         let localY = window.innerHeight - (touchEvent.clientY - rect.top);
@@ -81,11 +89,13 @@ function handleInteractions(canvas, runtimeState) {
     canvas.addEventListener("touchend", function (event) {
         if (generateSnowByMouseInterval !== undefined) {
             clearInterval(generateSnowByMouseInterval);
+            runtimeState.showFps = false;
         }
     });
     canvas.addEventListener("touchcancel", function (event) {
         if (generateSnowByMouseInterval !== undefined) {
             clearInterval(generateSnowByMouseInterval);
+            runtimeState.showFps = false;
         }
     });
 }
@@ -204,6 +214,7 @@ window.onload = function () {
             x: -1,
             y: -1,
             traineauPosition: canvas.width,
+            showFps: false,
         };
         monitorFPS(canvas, runtimeState, snow_count);
         handleInteractions(canvas, runtimeState);

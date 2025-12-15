@@ -7,8 +7,12 @@ function monitorFPS(canvas: HTMLCanvasElement, runtimeState, snow_count) {
     setInterval(function () {
         let count = runtimeState.frameCount;
         runtimeState.frameCount = 0;
-        fpsElement.textContent = "FPS: " + count + " " + window.devicePixelRatio + " " + canvas.width + " " + canvas.height + " " +
-            (canvas.width * canvas.height / snow_count);
+        if(runtimeState.showFps) {
+            fpsElement.textContent = "FPS: " + count + " " + window.devicePixelRatio + " " + canvas.width + " " + canvas.height + " " +
+                (canvas.width * canvas.height / snow_count);
+        } else {
+            fpsElement.textContent = "";
+        }
     }, 1000);
 }
 
@@ -23,6 +27,8 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
         if(runtimeState.x != -1 || runtimeState.y != -1) {
             return;
         }
+
+        runtimeState.showFps = true;
 
         const rect = canvas.getBoundingClientRect();
         const localX = event.clientX - rect.left;
@@ -44,6 +50,7 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
     canvas.addEventListener('mouseup', function(e) {
         if(generateSnowByMouseInterval !== undefined) {
             clearInterval(generateSnowByMouseInterval);
+            runtimeState.showFps = false;
         }
     });
 
@@ -59,6 +66,8 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
             return;
 
         const touchEvent = event.touches[0];
+
+        runtimeState.showFps = true;
 
         const rect = canvas.getBoundingClientRect();
         let localX = touchEvent.clientX - rect.left;
@@ -88,11 +97,13 @@ function handleInteractions(canvas: HTMLCanvasElement, runtimeState) {
     canvas.addEventListener("touchend", function(event) {
         if(generateSnowByMouseInterval !== undefined) {
             clearInterval(generateSnowByMouseInterval);
+            runtimeState.showFps = false;
         }
     });
     canvas.addEventListener("touchcancel", function(event) {
         if(generateSnowByMouseInterval !== undefined) {
             clearInterval(generateSnowByMouseInterval);
+            runtimeState.showFps = false;
         }
     });
 }
@@ -253,6 +264,7 @@ window.onload = function() {
             x: -1,
             y: -1,
             traineauPosition: canvas.width,
+            showFps: false,
         }
         monitorFPS(canvas, runtimeState, snow_count);
 
